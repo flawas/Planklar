@@ -3,11 +3,10 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Annotated
 
-from fastapi import APIRouter, Depends, Form, Request, UploadFile, status
+from fastapi import APIRouter, Depends, File, Form, Request, UploadFile, status
 from fastapi.responses import HTMLResponse, RedirectResponse, Response
 from fastapi.security import OAuth2PasswordRequestForm
 from fastapi.templating import Jinja2Templates
-from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.auth.users import (
@@ -17,16 +16,10 @@ from app.auth.users import (
     get_user_manager,
 )
 from app.config import get_settings
-from app.db.models import Dokument, User
+from app.db.models import User
 from app.db.session import get_session
-from app.dossiers.router import _basename
-from app.dossiers.service import (
-    DossierNotFoundError,
-    UploadError,
-    get_dossier,
-    get_storage,
-    upload_dokument,
-)
+from app.dossiers.scope import BueroScope, NotFoundError
+from app.dossiers.service import UploadError, basename, get_storage, upload_dokument
 from app.storage import Storage
 from app.web import csrf
 
@@ -44,6 +37,7 @@ MSG_UPLOAD = {
     "PDF_ENCRYPTED": "Das PDF ist passwortgeschützt.",
     "DUPLICATE": "Doppelt: Dieses Dokument ist im Dossier bereits vorhanden.",
 }
+MSG_KEINE_DATEI = "Bitte wählen Sie mindestens eine Datei aus."
 MSG_NOT_LOGGED_IN = "Bitte melden Sie sich an."
 
 
@@ -148,14 +142,6 @@ def logout(request: Request, csrf_token: Annotated[str, Form()] = "") -> Respons
     return response
 
 
-def _dokumente(session: Session, dossier_id: uuid.UUID) -> list[Dokument]:
-    return list(
-        session.scalars(
-            select(Dokument).where(Dokument.dossier_id == dossier_id).order_by(Dokument.created_at)
-        )
-    )
-
-
 @web_router.get("/dossiers/{dossier_id}", response_model=None)
 def dossier_seite(
     request: Request,
@@ -165,16 +151,17 @@ def dossier_seite(
 ) -> Response:
     if user is None:
         return RedirectResponse("/login", status.HTTP_303_SEE_OTHER)
+    scope = BueroScope(session, user.buero_id)
     try:
-        dossier = get_dossier(session, user.buero_id, dossier_id)
-    except DossierNotFoundError:
+        dossier = scope.get_dossier(dossier_id)
+    except NotFoundError:
         return _render(request, "nicht_gefunden.html", user=user, status_code=404)
     return _render(
         request,
         "dossier.html",
         user=user,
         dossier=dossier,
-        dokumente=_dokumente(session, dossier.id),
+        dokumente=scope.list_dokumente(dossier.id),
         ergebnisse=[],
     )
 
@@ -183,8 +170,8 @@ def dossier_seite(
 async def dossier_upload(
     request: Request,
     dossier_id: uuid.UUID,
-    files: list[UploadFile],
     user: Annotated[User | None, Depends(_optional_user)],
+    files: Annotated[list[UploadFile] | None, File()] = None,
     csrf_token: Annotated[str, Form()] = "",
     session: Session = Depends(get_session),
     storage: Storage = Depends(get_storage),
@@ -193,14 +180,18 @@ async def dossier_upload(
         return _render(request, "_fehler.html", status_code=401, error=MSG_NOT_LOGGED_IN)
     if not csrf.matches(request.cookies.get(csrf.CSRF_COOKIE), csrf_token):
         return _render(request, "_fehler.html", user=user, status_code=403, error=MSG_CSRF)
+    scope = BueroScope(session, user.buero_id)
     try:
-        dossier = get_dossier(session, user.buero_id, dossier_id)
-    except DossierNotFoundError:
+        dossier = scope.get_dossier(dossier_id)
+    except NotFoundError:
         return _render(request, "nicht_gefunden.html", user=user, status_code=404)
+    files = [f for f in files or [] if f.filename]
+    if not files:
+        return _render(request, "_fehler.html", user=user, status_code=400, error=MSG_KEINE_DATEI)
     limit = get_settings().max_upload_bytes
     ergebnisse: list[UploadErgebnis] = []
     for file in files:
-        name = _basename(file.filename or "")
+        name = basename(file.filename or "")
         data = await file.read(limit + 1)  # nie mehr als Limit + 1 Byte in den Speicher
         try:
             dok = upload_dokument(session, storage, dossier, name, data, limit)
@@ -212,6 +203,6 @@ async def dossier_upload(
         "_dokumente.html",
         user=user,
         dossier=dossier,
-        dokumente=_dokumente(session, dossier.id),
+        dokumente=scope.list_dokumente(dossier.id),
         ergebnisse=ergebnisse,
     )

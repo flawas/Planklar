@@ -1,10 +1,12 @@
 import re
 
+import pymupdf
 import pytest
 from fastapi.testclient import TestClient
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
+from app.config import get_settings
 from app.db.models import Dokument, Dossier, User
 from app.storage import Storage
 from tests.auth.conftest import make_user
@@ -98,4 +100,38 @@ def test_fremdes_dossier_404(client: TestClient, db: Session, setup) -> None:  #
     _, _, tok = setup
     assert client.get(f"/dossiers/{fremd.id}").status_code == 404
     assert up(client, fremd, [("a.pdf", make_pdf(1))], tok).status_code == 404
+    assert db.scalars(select(Dokument)).all() == []
+
+
+def test_zu_gross(client: TestClient, db: Session, setup, monkeypatch: pytest.MonkeyPatch) -> None:  # type: ignore[no-untyped-def]
+    _, dossier, tok = setup
+    data = make_pdf(1)
+    monkeypatch.setenv("MAX_UPLOAD_BYTES", str(len(data) - 1))
+    get_settings.cache_clear()
+    r = up(client, dossier, [("gross.pdf", data)], tok)
+    assert r.status_code == 200
+    assert "gross.pdf" in r.text and "zu gross" in r.text
+    assert db.scalars(select(Dokument)).all() == []
+
+
+def test_verschluesselt(client: TestClient, db: Session, setup) -> None:  # type: ignore[no-untyped-def]
+    _, dossier, tok = setup
+    doc = pymupdf.open()
+    doc.new_page()
+    data = doc.tobytes(encryption=pymupdf.PDF_ENCRYPT_AES_256, owner_pw="o", user_pw="u")
+    doc.close()
+    r = up(client, dossier, [("geheim.pdf", data)], tok)
+    assert r.status_code == 200
+    assert "geheim.pdf" in r.text and "passwortgeschützt" in r.text
+    assert db.scalars(select(Dokument)).all() == []
+
+
+def test_upload_ohne_dateien(client: TestClient, db: Session, setup) -> None:  # type: ignore[no-untyped-def]
+    _, dossier, tok = setup
+    r = client.post(
+        f"/dossiers/{dossier.id}/upload", data={"csrf_token": tok}, headers={"HX-Request": "true"}
+    )
+    assert r.status_code == 400
+    assert "<html" not in r.text
+    assert "mindestens eine Datei" in r.text
     assert db.scalars(select(Dokument)).all() == []

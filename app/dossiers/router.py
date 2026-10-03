@@ -1,5 +1,4 @@
 import uuid
-from pathlib import PurePosixPath, PureWindowsPath
 
 from fastapi import APIRouter, Depends, HTTPException, UploadFile, status
 from sqlalchemy.orm import Session
@@ -12,6 +11,7 @@ from app.dossiers.schemas import DokumentRead
 from app.dossiers.service import (
     DossierNotFoundError,
     UploadError,
+    basename,
     get_dossier,
     get_storage,
     upload_dokument,
@@ -27,10 +27,6 @@ _STATUS = {
     "PDF_ENCRYPTED": status.HTTP_422_UNPROCESSABLE_CONTENT,
     "DUPLICATE": status.HTTP_409_CONFLICT,
 }
-
-
-def _basename(name: str) -> str:
-    return PurePosixPath(PureWindowsPath(name).name).name or "dokument.pdf"
 
 
 @dossier_router.post(
@@ -51,7 +47,7 @@ async def upload(
     data = await file.read(limit + 1)  # nie mehr als Limit + 1 Byte in den Speicher
     try:
         return upload_dokument(
-            session, storage, dossier, _basename(file.filename or ""), data, limit
+            session, storage, dossier, basename(file.filename or ""), data, limit
         )
     except UploadError as exc:
         raise HTTPException(_STATUS[exc.code], exc.code) from None

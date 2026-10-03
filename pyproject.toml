@@ -41,7 +41,7 @@ include = ["app*"]
 
 [tool.setuptools.package-data]
 "app.web" = ["templates/*.html", "static/*"]
-"app.pipeline" = ["field_maps/*.json"]
+"app.pipeline" = ["field_maps/*.json", "prompts/*.txt"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

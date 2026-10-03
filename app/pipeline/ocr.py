@@ -1,6 +1,7 @@
 """OCR-Fallback für Seiten ohne Textlayer (Tesseract, Sprache deu)."""
 
 import shutil
+from pathlib import Path
 
 import pymupdf
 
@@ -16,7 +17,7 @@ def tesseract_available() -> bool:
         tessdata = pymupdf.get_tessdata()
     except Exception:
         return False
-    return bool(tessdata)
+    return bool(tessdata) and (Path(tessdata) / f"{OCR_LANGUAGE}.traineddata").is_file()
 
 
 def ocr_page(page: pymupdf.Page) -> str:

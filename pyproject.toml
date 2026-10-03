@@ -13,6 +13,14 @@ dependencies = [
     "pydantic-settings>=2.2",
     "pyyaml>=6",
     "jsonschema>=4.20",
+    "pymupdf>=1.24",
+    "celery[redis]>=5.3",
+    "sqlalchemy>=2.0",
+    "alembic>=1.13",
+    "psycopg[binary]>=3.1",
+    "fastapi-users>=15",
+    "python-multipart>=0.0.9",
+    "jinja2>=3.1",
 ]
 
 [project.optional-dependencies]
@@ -28,6 +36,9 @@ dev = [
 [tool.setuptools.packages.find]
 include = ["app*"]
 
+[tool.setuptools.package-data]
+"app.web" = ["templates/*.html", "static/*"]
+
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 
@@ -38,7 +49,14 @@ target-version = "py312"
 [tool.ruff.lint]
 select = ["E", "F", "I", "UP", "B"]
 
+[tool.ruff.lint.flake8-bugbear]
+extend-immutable-calls = ["fastapi.Depends"]
+
 [tool.mypy]
 python_version = "3.12"
 files = ["app/rules", "app/pipeline"]
 strict = true
+
+[[tool.mypy.overrides]]
+module = "app.pipeline.preprocess"
+disallow_untyped_calls = false

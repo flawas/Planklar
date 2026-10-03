@@ -1,11 +1,16 @@
+import json
 from pathlib import Path
 
 import pytest
 import yaml
 
-from app.rules.loader import RegelLadeFehler, load_catalog, load_file, load_kanton
+from app.rules.loader import DEFAULT_ROOT, RegelLadeFehler, load_catalog, load_file, load_kanton
 from app.rules.models import Check, Kanton, Schwere
+from app.rules.validate import validate_catalog
 
+_SCHEMA = json.loads((DEFAULT_ROOT / "schema.json").read_text(encoding="utf-8"))["$defs"]["regel"][
+    "properties"
+]
 FIXTURES = Path(__file__).resolve().parents[1] / "fixtures" / "rules" / "loader"
 
 RULE = {
@@ -55,6 +60,9 @@ def test_enums_cover_schema() -> None:
         "plan_merkmal",
         "manuell",
     }
+    assert {s.value for s in Schwere} == set(_SCHEMA["schwere"]["enum"])
+    assert {c.value for c in Check} == set(_SCHEMA["check"]["enum"])
+    assert {k.value for k in Kanton} == set(_SCHEMA["scope"]["properties"]["kanton"]["enum"])
 
 
 def test_missing_kanton_yaml_names_file() -> None:
@@ -122,3 +130,24 @@ def test_duplicate_id_in_file_rejected(tmp_path: Path) -> None:
     with pytest.raises(RegelLadeFehler, match="doppelte id") as exc:
         load_file(_write(tmp_path, [RULE, RULE]), Kanton.LU)
     assert exc.value.regel_id == "TEST-1"
+
+
+@pytest.mark.parametrize("schwere", ["fehlt_blockierend", "foo"])
+def test_schema_and_loader_agree(tmp_path: Path, schwere: str) -> None:
+    """Dieselbe Datei muss von schema.json und Loader gleich beurteilt werden."""
+    rules = [{**RULE, "schwere": schwere}]
+    (tmp_path / "LU").mkdir()
+    _write(tmp_path / "LU", rules)
+    schema_ok = not validate_catalog(tmp_path)
+    try:
+        load_file(tmp_path / "LU" / "kanton.yaml", Kanton.LU)
+        loader_ok = True
+    except RegelLadeFehler:
+        loader_ok = False
+    assert schema_ok == loader_ok == (schwere == "fehlt_blockierend")
+
+
+@pytest.mark.parametrize("name", ["ok"])
+def test_fixture_catalog_passes_schema_and_loader(name: str) -> None:
+    assert validate_catalog(FIXTURES / name) == []
+    load_catalog(FIXTURES / name)

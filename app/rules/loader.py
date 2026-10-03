@@ -83,7 +83,8 @@ def load_kanton(root: Path, kanton: Kanton) -> KantonsRegeln:
         if not regeln:
             continue
         name = regeln[0].scope.gemeinde
-        assert name is not None
+        if name is None:  # load_file stellt scope.gemeinde sicher
+            raise RegelLadeFehler(path, "scope.gemeinde fehlt")
         if name in gemeinden:
             raise RegelLadeFehler(path, f"Gemeinde '{name}' ist bereits in einer anderen Datei")
         gemeinden[name] = regeln

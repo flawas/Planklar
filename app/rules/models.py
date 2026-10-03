@@ -29,7 +29,6 @@ class Schwere(StrEnum):
     """Gewicht eines Befunds, wenn die Anforderung nicht erfüllt ist."""
 
     FEHLT_BLOCKIEREND = "fehlt_blockierend"
-    HINWEIS = "hinweis"
 
 
 class _Strict(BaseModel):

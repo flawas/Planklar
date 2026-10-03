@@ -4,7 +4,7 @@
   when: true
   requires: { typ: dokument, dokument: situationsplan }
   check: manuell
-  schwere: hinweis
+  schwere: fehlt_blockierend
   quelle: { erlass: "Beispiel-Reglement", paragraph: "Art. 2", url: "https://example.org/reglement" }
   stand: 2026-03-01
   disabled: true

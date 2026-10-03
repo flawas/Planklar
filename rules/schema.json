@@ -31,7 +31,7 @@
           "properties": { "typ": { "type": "string", "minLength": 1 } }
         },
         "check": { "enum": ["ki_klassifikation", "formularfeld", "plan_merkmal", "manuell"] },
-        "schwere": { "type": "string", "minLength": 1 },
+        "schwere": { "enum": ["fehlt_blockierend"] },
         "quelle": {
           "type": "object",
           "additionalProperties": false,

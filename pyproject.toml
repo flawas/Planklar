@@ -52,3 +52,6 @@ strict = true
 [[tool.mypy.overrides]]
 module = "app.pipeline.preprocess"
 disallow_untyped_calls = false
+
+[tool.setuptools.package-data]
+"app.pipeline" = ["field_maps/*.json"]

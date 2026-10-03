@@ -24,7 +24,8 @@ uvicorn app.main:app --reload    # lokal starten, GET /health
 celery -A app.worker worker --concurrency=2   # Worker (Broker: REDIS_URL)
 ```
 
-Noch nicht vorhanden: `python -m app.rules.validate`, `docker compose up -d`.
+`python -m app.rules.validate` validiert den Regelkatalog (`rules/`).
+Noch nicht vorhanden: `docker compose up -d`.
 
 ## Architektur
 

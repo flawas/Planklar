@@ -1,0 +1,23 @@
+{% if ergebnisse %}
+<ul class="ergebnisse">
+  {% for e in ergebnisse %}
+  <li class="{{ 'ok' if e.ok else 'fehler' }}"{% if not e.ok %} role="alert"{% endif %}>
+    <strong>{{ '✓ OK' if e.ok else '✗ Fehler' }}</strong>: {{ e.dateiname }} – {{ e.meldung }}
+  </li>
+  {% endfor %}
+</ul>
+{% endif %}
+<h2>Dokumente</h2>
+{% if dokumente %}
+<table class="liste">
+  <caption class="nur-sr">Hochgeladene Dokumente</caption>
+  <thead><tr><th scope="col">Name</th><th scope="col">Seiten</th></tr></thead>
+  <tbody>
+    {% for d in dokumente %}
+    <tr><td>{{ d.dateiname }}</td><td>{{ d.seitenzahl }}</td></tr>
+    {% endfor %}
+  </tbody>
+</table>
+{% else %}
+<p>Noch keine Dokumente hochgeladen.</p>
+{% endif %}

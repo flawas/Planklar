@@ -1,0 +1,20 @@
+{% extends "base.html" %}
+{% block title %}Dossier{% endblock %}
+{% block content %}
+<h1>Dossier {{ dossier.gemeinde }}</h1>
+<h2>Dokumente hochladen</h2>
+<form class="formular" method="post" action="/dossiers/{{ dossier.id }}/upload"
+      enctype="multipart/form-data"
+      hx-post="/dossiers/{{ dossier.id }}/upload" hx-encoding="multipart/form-data"
+      hx-target="#dokumente" hx-swap="innerHTML"
+      hx-on::xhr:progress="document.getElementById('fortschritt').value = event.detail.loaded / event.detail.total * 100">
+  <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+  <label for="files">PDF-Dateien (mehrere möglich)</label>
+  <input id="files" name="files" type="file" accept="application/pdf,.pdf" multiple required>
+  <progress id="fortschritt" class="fortschritt" max="100" value="0" aria-label="Upload-Fortschritt"></progress>
+  <button type="submit">Hochladen</button>
+</form>
+<section id="dokumente" aria-live="polite">
+  {% include "_dokumente.html" %}
+</section>
+{% endblock %}

@@ -6,7 +6,7 @@ import pytest
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
 
-from app.logging_setup import install_request_logging, log_event
+from app.logging_setup import configure_logging, install_request_logging, log_event
 
 
 def _records(caplog: pytest.LogCaptureFixture) -> list[dict]:
@@ -34,6 +34,7 @@ def client() -> TestClient:
 
 @pytest.fixture(autouse=True)
 def _propagate() -> None:
+    configure_logging()
     logging.getLogger("planklar").propagate = True
 
 

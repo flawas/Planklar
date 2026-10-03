@@ -21,6 +21,7 @@ ruff format --check .            # Format (ohne --check: formatieren)
 mypy                             # app/rules und app/pipeline
 pytest                           # Tests (tests/ spiegelt app/)
 uvicorn app.main:app --reload    # lokal starten, GET /health
+celery -A app.worker worker --concurrency=2   # Worker (Broker: REDIS_URL)
 ```
 
 Noch nicht vorhanden: `python -m app.rules.validate`, `docker compose up -d`.

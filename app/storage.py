@@ -10,14 +10,24 @@ from botocore.exceptions import ClientError
 from app.config import Settings, get_settings
 
 _SHA256_RE = re.compile(r"[0-9a-f]{64}")
+_ID_RE = re.compile(r"[0-9]+")
 
 
 class ObjectNotFoundError(Exception):
     """Objekt existiert nicht (enthält nur den Fehlercode, keinen Inhalt)."""
 
 
-def object_key(buero_id: int | str, dossier_id: int | str, sha256: str) -> str:
+def _check_id(name: str, value: int) -> int:
+    # bool ist eine int-Unterklasse; ausschliessen. Nur nichtnegative Ganzzahlen.
+    if isinstance(value, bool) or not isinstance(value, int) or not _ID_RE.fullmatch(str(value)):
+        raise ValueError(f"{name} muss eine nichtnegative Ganzzahl sein")
+    return value
+
+
+def object_key(buero_id: int, dossier_id: int, sha256: str) -> str:
     """Objektpfad `buero/<id>/dossier/<id>/<sha256>.pdf`."""
+    buero_id = _check_id("buero_id", buero_id)
+    dossier_id = _check_id("dossier_id", dossier_id)
     if not _SHA256_RE.fullmatch(sha256):
         raise ValueError("sha256 muss 64 Hex-Zeichen (klein) enthalten")
     return f"buero/{buero_id}/dossier/{dossier_id}/{sha256}.pdf"
@@ -45,10 +55,21 @@ class Storage:
                 raise
             self._client.create_bucket(Bucket=self._bucket)
 
-    def put(self, key: str, data: bytes, content_type: str = "application/pdf") -> None:
+    def put(
+        self,
+        buero_id: int,
+        dossier_id: int,
+        sha256: str,
+        data: bytes,
+        content_type: str = "application/pdf",
+    ) -> str:
+        """Speichert das Objekt im Präfix des Büros und gibt den Schlüssel zurück."""
+        key = object_key(buero_id, dossier_id, sha256)
         self._client.put_object(Bucket=self._bucket, Key=key, Body=data, ContentType=content_type)
+        return key
 
-    def get(self, key: str) -> bytes:
+    def get(self, buero_id: int, dossier_id: int, sha256: str) -> bytes:
+        key = object_key(buero_id, dossier_id, sha256)
         try:
             body: bytes = self._client.get_object(Bucket=self._bucket, Key=key)["Body"].read()
         except ClientError as exc:
@@ -57,10 +78,14 @@ class Storage:
             raise
         return body
 
-    def delete(self, key: str) -> None:
+    def delete(self, buero_id: int, dossier_id: int, sha256: str) -> None:
+        key = object_key(buero_id, dossier_id, sha256)
         self._client.delete_object(Bucket=self._bucket, Key=key)
 
-    def signed_url(self, key: str, expires_in: int | None = None) -> str:
+    def signed_url(
+        self, buero_id: int, dossier_id: int, sha256: str, expires_in: int | None = None
+    ) -> str:
+        key = object_key(buero_id, dossier_id, sha256)
         ttl = self._settings.signed_url_ttl_seconds if expires_in is None else expires_in
         if ttl <= 0:
             raise ValueError("expires_in muss positiv sein")

@@ -11,6 +11,7 @@ dependencies = [
     "fastapi>=0.110",
     "uvicorn>=0.29",
     "pydantic-settings>=2.2",
+    "pymupdf>=1.24",
 ]
 
 [project.optional-dependencies]
@@ -38,3 +39,7 @@ select = ["E", "F", "I", "UP", "B"]
 python_version = "3.12"
 files = ["app/rules", "app/pipeline"]
 strict = true
+
+[[tool.mypy.overrides]]
+module = "app.pipeline.preprocess"
+disallow_untyped_calls = false

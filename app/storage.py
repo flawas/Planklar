@@ -1,6 +1,7 @@
 """Schmale Schnittstelle zum S3-kompatiblen Objektspeicher (MinIO)."""
 
 import re
+import uuid
 from typing import Any
 
 import boto3
@@ -17,14 +18,17 @@ class ObjectNotFoundError(Exception):
     """Objekt existiert nicht (enthält nur den Fehlercode, keinen Inhalt)."""
 
 
-def _check_id(name: str, value: int) -> int:
+def _check_id(name: str, value: int | uuid.UUID) -> int | uuid.UUID:
+    # UUIDs sind die IDs der Modelle; Ganzzahlen bleiben erlaubt.
+    if isinstance(value, uuid.UUID):
+        return value
     # bool ist eine int-Unterklasse; ausschliessen. Nur nichtnegative Ganzzahlen.
     if isinstance(value, bool) or not isinstance(value, int) or not _ID_RE.fullmatch(str(value)):
-        raise ValueError(f"{name} muss eine nichtnegative Ganzzahl sein")
+        raise ValueError(f"{name} muss eine nichtnegative Ganzzahl oder UUID sein")
     return value
 
 
-def object_key(buero_id: int, dossier_id: int, sha256: str) -> str:
+def object_key(buero_id: int | uuid.UUID, dossier_id: int | uuid.UUID, sha256: str) -> str:
     """Objektpfad `buero/<id>/dossier/<id>/<sha256>.pdf`."""
     buero_id = _check_id("buero_id", buero_id)
     dossier_id = _check_id("dossier_id", dossier_id)
@@ -57,8 +61,8 @@ class Storage:
 
     def put(
         self,
-        buero_id: int,
-        dossier_id: int,
+        buero_id: int | uuid.UUID,
+        dossier_id: int | uuid.UUID,
         sha256: str,
         data: bytes,
         content_type: str = "application/pdf",
@@ -68,7 +72,7 @@ class Storage:
         self._client.put_object(Bucket=self._bucket, Key=key, Body=data, ContentType=content_type)
         return key
 
-    def get(self, buero_id: int, dossier_id: int, sha256: str) -> bytes:
+    def get(self, buero_id: int | uuid.UUID, dossier_id: int | uuid.UUID, sha256: str) -> bytes:
         key = object_key(buero_id, dossier_id, sha256)
         try:
             body: bytes = self._client.get_object(Bucket=self._bucket, Key=key)["Body"].read()
@@ -78,12 +82,16 @@ class Storage:
             raise
         return body
 
-    def delete(self, buero_id: int, dossier_id: int, sha256: str) -> None:
+    def delete(self, buero_id: int | uuid.UUID, dossier_id: int | uuid.UUID, sha256: str) -> None:
         key = object_key(buero_id, dossier_id, sha256)
         self._client.delete_object(Bucket=self._bucket, Key=key)
 
     def signed_url(
-        self, buero_id: int, dossier_id: int, sha256: str, expires_in: int | None = None
+        self,
+        buero_id: int | uuid.UUID,
+        dossier_id: int | uuid.UUID,
+        sha256: str,
+        expires_in: int | None = None,
     ) -> str:
         key = object_key(buero_id, dossier_id, sha256)
         ttl = self._settings.signed_url_ttl_seconds if expires_in is None else expires_in

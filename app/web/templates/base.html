@@ -1,0 +1,29 @@
+<!doctype html>
+<html lang="de-CH">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>{% block title %}Planklar{% endblock %} – Planklar</title>
+  <link rel="stylesheet" href="{{ url_for('static', path='style.css') }}">
+  <script src="{{ url_for('static', path='htmx.min.js') }}" defer></script>
+</head>
+<body>
+  <a class="skip" href="#inhalt">Zum Inhalt springen</a>
+  <header class="kopf">
+    <a class="marke" href="/">Planklar</a>
+    {% if user %}
+    <form method="post" action="/logout" class="abmelden">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+      <span>{{ user.email }}</span>
+      <button type="submit">Abmelden</button>
+    </form>
+    {% endif %}
+  </header>
+  <main id="inhalt">
+    {% block content %}{% endblock %}
+  </main>
+  <footer class="fuss">
+    <p>Das Tool gibt Hinweise und entscheidet nichts.</p>
+  </footer>
+</body>
+</html>

@@ -1,0 +1,47 @@
+name: Agent – Backlog planen
+
+# Manuell starten: der product-owner-Agent zerlegt den Implementationsplan in Issues.
+on:
+  workflow_dispatch:
+    inputs:
+      focus:
+        description: "Optional: nur diese Phase/Thema planen (z.B. 'Phase 0 und 1')"
+        required: false
+        default: ""
+
+permissions:
+  contents: read
+  issues: write
+  id-token: write
+
+jobs:
+  plan:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - name: Secrets aus 1Password laden
+        uses: 1password/load-secrets-action@v2
+        with:
+          export-env: true
+        env:
+          OP_SERVICE_ACCOUNT_TOKEN: ${{ secrets.OP_SERVICE_ACCOUNT_TOKEN }}
+          AGENT_PAT: op://Github Actions/GitHub Agent PAT/Anmeldedaten
+          CLAUDE_CODE_OAUTH_TOKEN: op://Github Actions/Claude OAUTH Token/Anmeldedaten
+      - uses: actions/checkout@v4
+      - name: Labels anlegen
+        env:
+          GH_TOKEN: ${{ env.AGENT_PAT }}
+        run: bash .github/scripts/setup-labels.sh
+      - uses: anthropics/claude-code-action@v1
+        with:
+          claude_code_oauth_token: ${{ env.CLAUDE_CODE_OAUTH_TOKEN }}
+          github_token: ${{ env.AGENT_PAT }}
+          prompt: |
+            Du arbeitest als Rolle "product-owner". Lies CLAUDE.md und .claude/agents/product-owner.md und folge der Rolle.
+            Fokus: ${{ inputs.focus || 'gesamter MVP, Phase 0 bis 5' }}.
+            Wichtig: Issues, die `status:ready` bekommen, starten sofort einen Entwickler-Agent. Vergib `status:ready`
+            deshalb zuletzt und nur für Issues ohne Abhängigkeit.
+          claude_args: |
+            --model claude-sonnet-5-5
+            --max-turns 40
+            --allowedTools "Read,Glob,Grep,Bash(gh issue:*),Bash(gh label:*)"

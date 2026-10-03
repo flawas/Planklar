@@ -1,0 +1,92 @@
+name: Agent – Issue umsetzen
+
+# Startet, sobald ein Issue das Label status:ready bekommt.
+# Die Rolle ergibt sich aus dem Label agent:<rolle>.
+on:
+  issues:
+    types: [labeled]
+
+concurrency:
+  group: agent-dev-${{ github.event.issue.number }}
+  cancel-in-progress: false
+
+permissions:
+  contents: write
+  pull-requests: write
+  issues: write
+  id-token: write
+
+jobs:
+  implement:
+    if: github.event.label.name == 'status:ready'
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - name: Secrets aus 1Password laden
+        uses: 1password/load-secrets-action@v2
+        with:
+          export-env: true
+        env:
+          OP_SERVICE_ACCOUNT_TOKEN: ${{ secrets.OP_SERVICE_ACCOUNT_TOKEN }}
+          AGENT_PAT: op://Github Actions/GitHub Agent PAT/Anmeldedaten
+          CLAUDE_CODE_OAUTH_TOKEN: op://Github Actions/Claude OAUTH Token/Anmeldedaten
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          token: ${{ env.AGENT_PAT }}
+
+      - name: Rolle bestimmen
+        id: role
+        env:
+          GH_TOKEN: ${{ env.AGENT_PAT }}
+        run: |
+          role=$(gh issue view ${{ github.event.issue.number }} --json labels -q '.labels[].name' \
+                 | grep '^agent:' | head -1 | cut -d: -f2 || true)
+          if [ -z "$role" ] || [ ! -f ".claude/agents/$role.md" ]; then
+            gh issue comment ${{ github.event.issue.number }} --body "Keine gültige Rolle (agent:*) gefunden. Label setzen und status:ready erneut vergeben."
+            exit 1
+          fi
+          echo "role=$role" >> "$GITHUB_OUTPUT"
+
+      - name: Status setzen
+        env:
+          GH_TOKEN: ${{ env.AGENT_PAT }}
+        run: gh issue edit ${{ github.event.issue.number }} --remove-label status:ready --add-label status:in-progress
+
+      - name: Python-Umgebung (falls vorhanden)
+        if: hashFiles('pyproject.toml') != ''
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Agent ausführen
+        uses: anthropics/claude-code-action@v1
+        with:
+          claude_code_oauth_token: ${{ env.CLAUDE_CODE_OAUTH_TOKEN }}
+          github_token: ${{ env.AGENT_PAT }}
+          prompt: |
+            Du arbeitest als Rolle "${{ steps.role.outputs.role }}".
+            Lies zuerst CLAUDE.md und .claude/agents/${{ steps.role.outputs.role }}.md und halte dich daran.
+
+            Aufgabe: Issue #${{ github.event.issue.number }} in ${{ github.repository }} umsetzen
+            (lies es mit `gh issue view ${{ github.event.issue.number }} --comments`).
+
+            Ablauf:
+            1. Branch `agent/${{ steps.role.outputs.role }}/issue-${{ github.event.issue.number }}` von main erstellen.
+            2. Akzeptanzkriterien als Tests formulieren, implementieren, Lint und Tests lokal ausführen, bis grün.
+            3. In kleinen, sinnvollen Commits einchecken (Conventional Commits, deutsch oder englisch konsistent).
+            4. Branch pushen und PR gegen main öffnen: Titel wie das Issue, Body mit "Closes #${{ github.event.issue.number }}", kurzer Zusammenfassung und Teststand.
+            5. Bleibt etwas unklar oder blockiert: nicht raten. Kommentar im Issue mit der konkreten Frage, Label `needs-human` setzen, Label `status:in-progress` entfernen, keinen PR öffnen.
+            Bearbeite ausschliesslich dieses Issue.
+          claude_args: |
+            --model claude-sonnet-5-5
+            --max-turns 60
+            --allowedTools "Read,Write,Edit,Glob,Grep,Bash"
+
+      - name: Bei Fehlschlag markieren
+        if: failure()
+        env:
+          GH_TOKEN: ${{ env.AGENT_PAT }}
+        run: |
+          gh issue edit ${{ github.event.issue.number }} --remove-label status:in-progress --add-label needs-human || true
+          gh issue comment ${{ github.event.issue.number }} --body "Agent-Lauf fehlgeschlagen: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}" || true

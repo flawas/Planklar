@@ -1,0 +1,37 @@
+# CLAUDE.md
+
+This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+
+## Project
+
+Planklar is a pre-submission check for Swiss building permit applications (Baugesuche). It validates forms, plans, and attachments for completeness against cantonal and communal requirements before submission. Initial scope covers the cantons of Luzern and Schwyz.
+
+The authoritative design is `Implementationsplan Baugesuch-Check.md` (scope, stack, data model, pipeline, tests, privacy). Follow it; deviations need an ADR in `docs/adr/`.
+
+## Status
+
+Source code does not exist yet; the backlog is built by the agent pipeline (see below). Once the scaffold lands, document build, lint and test commands here (expected: `pip install -e ".[dev]"`, `ruff check .`, `ruff format --check .`, `pytest`, `python -m app.rules.validate`, `docker compose up -d`).
+
+## Domain rules (apply to every agent and every change)
+
+- Formal completeness only. No substantive building-law checks (distances, utilisation, zoning). The tool gives hints and decides nothing.
+- The AI answers narrow single questions; only the rule engine (`app/rules`) decides `erfüllt / fehlt / unsicher / manuell`. When in doubt, never `erfüllt`.
+- Every rule has a verifiable source (Erlass, Paragraph, URL) and `stand`. Never invent rules.
+- No document contents or personal data in logs. Only whole pages/tiles go to the model, never whole dossiers.
+- Tenant isolation per Büro on every data access.
+- Never commit real building applications. Synthetic fixtures only.
+- UI language German (Swiss spelling).
+
+## Agent pipeline
+
+Roles live in `.claude/agents/`: `product-owner`, `architect`, `backend`, `pipeline`, `rules`, `frontend`, `devops`, `qa`, `reviewer`. Each takes one kind of developer task.
+
+Flow (GitHub Actions in `.github/workflows/`):
+
+1. `agent-planner.yml` (manual) – product-owner turns the plan into issues with `agent:<role>`, `phase:<n>`, `status:ready|blocked` and `Depends on: #N`.
+2. `agent-dev.yml` – label `status:ready` starts the matching role; it opens a PR from `agent/<role>/issue-<n>` with `Closes #<n>`.
+3. `agent-review.yml` – reviewer comments and sets `review:approved` or `review:changes-requested`; the dev role fixes (max 3 rounds, commits prefixed `fix(review):`, then `needs-human`). Optional auto-merge with repo variable `AUTO_MERGE=true`; otherwise a human merges.
+4. `agent-orchestrator.yml` – on merge, `.github/scripts/unblock.sh` flips `status:blocked` to `status:ready` for issues whose dependencies are closed.
+5. `ci.yml` – lint, tests, rule validation, docker build (each job activates once its files exist).
+
+Required secrets: `OP_SERVICE_ACCOUNT_TOKEN` (GitHub secret). The workflows load `AGENT_PAT` (GitHub PAT or App token; item "GitHub Agent PAT") and `CLAUDE_CODE_OAUTH_TOKEN` (item "Claude OAUTH Token") from the 1Password vault "Github Actions". Use a PAT/App token rather than `GITHUB_TOKEN` because events created with the default `GITHUB_TOKEN` do not trigger other workflows, so the chain would stop. Run `.github/scripts/setup-labels.sh` once. Use branch protection on `main` requiring CI.

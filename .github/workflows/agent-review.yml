@@ -1,0 +1,131 @@
+name: Agent – Review und Nachbesserung
+
+# 1) Neuer/aktualisierter Agent-PR  -> reviewer-Agent prüft und setzt ein review:*-Label
+# 2) Label review:changes-requested  -> Entwickler-Agent der PR-Rolle bessert nach (max. 3 Runden)
+# 3) Label review:approved           -> optional Auto-Merge (Repo-Variable AUTO_MERGE=true)
+on:
+  pull_request:
+    types: [opened, synchronize, reopened, labeled]
+
+permissions:
+  contents: write
+  pull-requests: write
+  issues: write
+  id-token: write
+
+concurrency:
+  group: agent-review-${{ github.event.pull_request.number }}
+  cancel-in-progress: false
+
+jobs:
+  review:
+    if: >
+      startsWith(github.event.pull_request.head.ref, 'agent/') &&
+      github.event.action != 'labeled'
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Secrets aus 1Password laden
+        uses: 1password/load-secrets-action@v2
+        with:
+          export-env: true
+        env:
+          OP_SERVICE_ACCOUNT_TOKEN: ${{ secrets.OP_SERVICE_ACCOUNT_TOKEN }}
+          AGENT_PAT: op://Github Actions/GitHub Agent PAT/Anmeldedaten
+          CLAUDE_CODE_OAUTH_TOKEN: op://Github Actions/Claude OAUTH Token/Anmeldedaten
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          token: ${{ env.AGENT_PAT }}
+      - name: Alte Review-Labels entfernen
+        env:
+          GH_TOKEN: ${{ env.AGENT_PAT }}
+        run: gh pr edit ${{ github.event.pull_request.number }} --remove-label review:approved --remove-label review:changes-requested || true
+      - uses: anthropics/claude-code-action@v1
+        with:
+          claude_code_oauth_token: ${{ env.CLAUDE_CODE_OAUTH_TOKEN }}
+          github_token: ${{ env.AGENT_PAT }}
+          prompt: |
+            Du arbeitest als Rolle "reviewer". Lies CLAUDE.md und .claude/agents/reviewer.md.
+            Prüfe PR #${{ github.event.pull_request.number }} (`gh pr view` und `gh pr diff`), das verlinkte Issue
+            und den CI-Status (`gh pr checks`). Folge exakt dem Ausgabeformat der Rolle.
+          claude_args: |
+            --model claude-sonnet-5-5
+            --max-turns 25
+            --allowedTools "Read,Glob,Grep,Bash(gh pr:*),Bash(gh issue view:*),Bash(git diff:*),Bash(git log:*)"
+
+  fix:
+    if: >
+      github.event.action == 'labeled' &&
+      github.event.label.name == 'review:changes-requested' &&
+      startsWith(github.event.pull_request.head.ref, 'agent/')
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - name: Secrets aus 1Password laden
+        uses: 1password/load-secrets-action@v2
+        with:
+          export-env: true
+        env:
+          OP_SERVICE_ACCOUNT_TOKEN: ${{ secrets.OP_SERVICE_ACCOUNT_TOKEN }}
+          AGENT_PAT: op://Github Actions/GitHub Agent PAT/Anmeldedaten
+          CLAUDE_CODE_OAUTH_TOKEN: op://Github Actions/Claude OAUTH Token/Anmeldedaten
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.ref }}
+          fetch-depth: 0
+          token: ${{ env.AGENT_PAT }}
+
+      - name: Rolle und Runde bestimmen
+        id: ctx
+        env:
+          GH_TOKEN: ${{ env.AGENT_PAT }}
+        run: |
+          ref='${{ github.event.pull_request.head.ref }}'
+          role=$(cut -d/ -f2 <<<"$ref")
+          rounds=$(git log origin/main..HEAD --format=%s | grep -c '^fix(review)' || true)
+          echo "role=$role"     >> "$GITHUB_OUTPUT"
+          echo "rounds=$rounds" >> "$GITHUB_OUTPUT"
+          if [ "$rounds" -ge 3 ]; then
+            gh pr edit ${{ github.event.pull_request.number }} --add-label needs-human
+            gh pr comment ${{ github.event.pull_request.number }} --body "3 Nachbesserungsrunden erreicht. Mensch bitte übernehmen."
+            echo "stop=true" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Agent ausführen
+        if: steps.ctx.outputs.stop != 'true'
+        uses: anthropics/claude-code-action@v1
+        with:
+          claude_code_oauth_token: ${{ env.CLAUDE_CODE_OAUTH_TOKEN }}
+          github_token: ${{ env.AGENT_PAT }}
+          prompt: |
+            Du arbeitest als Rolle "${{ steps.ctx.outputs.role }}". Lies CLAUDE.md und .claude/agents/${{ steps.ctx.outputs.role }}.md.
+            Du bist auf dem Branch von PR #${{ github.event.pull_request.number }}. Lies den letzten Review-Kommentar
+            (`gh pr view ${{ github.event.pull_request.number }} --comments`) und behebe alle `blocker` und `should`.
+            Tests und Lint lokal grün machen. Commit-Nachricht muss mit `fix(review):` beginnen. Pushen.
+            Danach Label `review:changes-requested` vom PR entfernen. Keine neuen Features.
+          claude_args: |
+            --model claude-sonnet-5-5
+            --max-turns 50
+            --allowedTools "Read,Write,Edit,Glob,Grep,Bash"
+
+  automerge:
+    if: >
+      github.event.action == 'labeled' &&
+      github.event.label.name == 'review:approved' &&
+      vars.AUTO_MERGE == 'true' &&
+      startsWith(github.event.pull_request.head.ref, 'agent/')
+    runs-on: ubuntu-latest
+    steps:
+      - name: Secrets aus 1Password laden
+        uses: 1password/load-secrets-action@v2
+        with:
+          export-env: true
+        env:
+          OP_SERVICE_ACCOUNT_TOKEN: ${{ secrets.OP_SERVICE_ACCOUNT_TOKEN }}
+          AGENT_PAT: op://Github Actions/GitHub Agent PAT/Anmeldedaten
+          CLAUDE_CODE_OAUTH_TOKEN: op://Github Actions/Claude OAUTH Token/Anmeldedaten
+      - name: Auto-Merge aktivieren (wartet auf grünes CI)
+        env:
+          GH_TOKEN: ${{ env.AGENT_PAT }}
+        run: gh pr merge ${{ github.event.pull_request.number }} --auto --squash --delete-branch --repo ${{ github.repository }}

@@ -1,0 +1,187 @@
+# Kantonsbasis Luzern. Nur formelle Vollständigkeit der Beilagen, keine materielle Baurechtsprüfung.
+# Variablen in `when`: vorhabenstyp, gewaesserbezug, kantonsstrassenbezug, waldbezug, ausserhalb_bauzone.
+# Nicht abgedeckte Lücken: siehe PR zu Issue #24.
+
+- id: LU-PBV55-1-baugesuchsformular
+  titel: Baugesuchsformular (kantonales eFormular)
+  scope: { kanton: LU }
+  when: true
+  requires:
+    typ: dokument
+    dokument: Baugesuchsformular
+  check: ki_klassifikation
+  schwere: fehlt_blockierend
+  quelle: { erlass: "PBV LU (SRL Nr. 736)", paragraph: "§ 55 Abs. 1", url: "https://srl.lu.ch/app/de/texts_of_law/736/versions/3092" }
+  stand: 2026-10-03
+
+# Eigenhändig unterzeichnet als PDF oder mit qualifizierter elektronischer Signatur. Unterschrift ist nicht automatisch prüfbar.
+- id: LU-PBV56-1-unterschriftenblatt
+  titel: Unterzeichnetes Unterschriftenblatt zum Baugesuch
+  scope: { kanton: LU }
+  when: true
+  requires:
+    typ: dokument
+    dokument: Unterschriftenblatt
+  check: manuell
+  schwere: fehlt_blockierend
+  quelle: { erlass: "PBV LU (SRL Nr. 736)", paragraph: "§ 56 Abs. 1", url: "https://srl.lu.ch/app/de/texts_of_law/736/versions/3092" }
+  stand: 2026-10-03
+
+- id: LU-PBV55-2a-situationsplan
+  titel: Situationsplan (in der Regel 1:500)
+  scope: { kanton: LU }
+  when: true
+  requires:
+    typ: dokument
+    dokument: Situationsplan
+  check: ki_klassifikation
+  schwere: fehlt_blockierend
+  quelle: { erlass: "PBV LU (SRL Nr. 736)", paragraph: "§ 55 Abs. 2 lit. a", url: "https://srl.lu.ch/app/de/texts_of_law/736/versions/3092" }
+  stand: 2026-10-03
+
+- id: LU-PBV55-2b-grundriss
+  titel: Grundrisspläne aller Geschosse (Mindestmassstab 1:100)
+  scope: { kanton: LU }
+  when: true
+  requires:
+    typ: dokument
+    dokument: Grundriss
+  check: ki_klassifikation
+  schwere: fehlt_blockierend
+  quelle: { erlass: "PBV LU (SRL Nr. 736)", paragraph: "§ 55 Abs. 2 lit. b", url: "https://srl.lu.ch/app/de/texts_of_law/736/versions/3092" }
+  stand: 2026-10-03
+
+- id: LU-PBV55-2b-fassade
+  titel: Fassadenpläne (Mindestmassstab 1:100)
+  scope: { kanton: LU }
+  when: true
+  requires:
+    typ: dokument
+    dokument: Fassade/Ansicht
+  check: ki_klassifikation
+  schwere: fehlt_blockierend
+  quelle: { erlass: "PBV LU (SRL Nr. 736)", paragraph: "§ 55 Abs. 2 lit. b", url: "https://srl.lu.ch/app/de/texts_of_law/736/versions/3092" }
+  stand: 2026-10-03
+
+- id: LU-PBV55-2b-schnitt
+  titel: Schnittpläne (Mindestmassstab 1:100)
+  scope: { kanton: LU }
+  when: true
+  requires:
+    typ: dokument
+    dokument: Schnitt
+  check: ki_klassifikation
+  schwere: fehlt_blockierend
+  quelle: { erlass: "PBV LU (SRL Nr. 736)", paragraph: "§ 55 Abs. 2 lit. b", url: "https://srl.lu.ch/app/de/texts_of_law/736/versions/3092" }
+  stand: 2026-10-03
+
+- id: LU-PBV55-2c-umgebungsplan
+  titel: Umgebungsplan 1:100
+  scope: { kanton: LU }
+  when: true
+  requires:
+    typ: dokument
+    dokument: Umgebungsplan
+  check: ki_klassifikation
+  schwere: fehlt_blockierend
+  quelle: { erlass: "PBV LU (SRL Nr. 736)", paragraph: "§ 55 Abs. 2 lit. c", url: "https://srl.lu.ch/app/de/texts_of_law/736/versions/3092" }
+  stand: 2026-10-03
+
+- id: LU-PBV55-2e-entwaesserungsplan
+  titel: Pläne für die Abwasseranlagen (Entwässerungs- und Kanalisationsplan) 1:100
+  scope: { kanton: LU }
+  when: true
+  requires:
+    typ: dokument
+    dokument: Entwässerungsplan
+  check: ki_klassifikation
+  schwere: fehlt_blockierend
+  quelle: { erlass: "PBV LU (SRL Nr. 736)", paragraph: "§ 55 Abs. 2 lit. e", url: "https://srl.lu.ch/app/de/texts_of_law/736/versions/3092" }
+  stand: 2026-10-03
+
+# Bestehend schwarz oder grau, neu rot, abzubrechend gelb.
+- id: LU-PBV55-4-farbkennzeichnung
+  titel: Bestehende, neue und abzubrechende Bauteile in den Bauplänen farblich gekennzeichnet
+  scope: { kanton: LU }
+  when: { "==": [{ var: vorhabenstyp }, "umbau_anbau"] }
+  requires:
+    typ: merkmal
+    merkmal: farbkennzeichnung_bestand_neu_abbruch
+  check: manuell
+  schwere: hinweis
+  quelle: { erlass: "PBV LU (SRL Nr. 736)", paragraph: "§ 55 Abs. 4", url: "https://srl.lu.ch/app/de/texts_of_law/736/versions/3092" }
+  stand: 2026-10-03
+
+- id: LU-PBV55-5-beilagenverzeichnis
+  titel: Beilagen datiert, Pläne nummeriert und im Beilagenverzeichnis aufgeführt
+  scope: { kanton: LU }
+  when: true
+  requires:
+    typ: merkmal
+    merkmal: beilagen_datiert_plaene_nummeriert
+  check: manuell
+  schwere: hinweis
+  quelle: { erlass: "PBV LU (SRL Nr. 736)", paragraph: "§ 55 Abs. 5", url: "https://srl.lu.ch/app/de/texts_of_law/736/versions/3092" }
+  stand: 2026-10-03
+
+# Betrifft § 26/27 WBG, Art. 41c GSchV. Ob ein Gewässerbezug besteht, gibt die Planerin oder der Planer an.
+- id: LU-WEG-gewaesser-querprofil
+  titel: Projektbeschrieb und Querprofile bei Bauten im Gewässerraum oder Unterabstand zum Gewässer
+  scope: { kanton: LU }
+  when: { "==": [{ var: gewaesserbezug }, true] }
+  requires:
+    typ: dokument
+    dokument: Querprofil Gewässer
+  check: manuell
+  schwere: fehlt_blockierend
+  quelle: { erlass: "rawi-Wegleitung Baugesuch und Beilagen (Stand Juli 2026)", paragraph: "Ziff. 1.2.2.2", url: "https://rawi.lu.ch/-/media/RAWI/Dokumente/Baubewilligungen/dl_wegleitung_baugesuch_und_beilagen.pdf" }
+  stand: 2026-10-03
+
+- id: LU-WEG-baugrubensicherung-gewaesserraum
+  titel: Plan der Baugrubensicherung bei Bauvorhaben direkt am Gewässerraum
+  scope: { kanton: LU }
+  when: { "==": [{ var: gewaesserbezug }, true] }
+  requires:
+    typ: dokument
+    dokument: Plan Baugrubensicherung
+  check: manuell
+  schwere: fehlt_blockierend
+  quelle: { erlass: "rawi-Wegleitung Baugesuch und Beilagen (Stand Juli 2026)", paragraph: "Ziff. 1.2.1 (Baupläne)", url: "https://rawi.lu.ch/-/media/RAWI/Dokumente/Baubewilligungen/dl_wegleitung_baugesuch_und_beilagen.pdf" }
+  stand: 2026-10-03
+
+# Betrifft §§ 84 ff. StrG.
+- id: LU-WEG-kantonsstrasse-gelaendeschnitt
+  titel: Vermasste und kotierte Geländeschnitte bis und mit Kantonsstrasse bei Bauten im Unterabstand
+  scope: { kanton: LU }
+  when: { "==": [{ var: kantonsstrassenbezug }, true] }
+  requires:
+    typ: dokument
+    dokument: Geländeschnitt Kantonsstrasse
+  check: manuell
+  schwere: fehlt_blockierend
+  quelle: { erlass: "rawi-Wegleitung Baugesuch und Beilagen (Stand Juli 2026)", paragraph: "Ziff. 1.2.2.3", url: "https://rawi.lu.ch/-/media/RAWI/Dokumente/Baubewilligungen/dl_wegleitung_baugesuch_und_beilagen.pdf" }
+  stand: 2026-10-03
+
+- id: LU-WEG-wald-querprofil
+  titel: Situation mit statischem Waldrand und Querprofil bei Bauten im Unterabstand zum Wald
+  scope: { kanton: LU }
+  when: { "==": [{ var: waldbezug }, true] }
+  requires:
+    typ: dokument
+    dokument: Querprofil Wald
+  check: manuell
+  schwere: fehlt_blockierend
+  quelle: { erlass: "rawi-Wegleitung Baugesuch und Beilagen (Stand Juli 2026)", paragraph: "Ziff. 1.2.2.4", url: "https://rawi.lu.ch/-/media/RAWI/Dokumente/Baubewilligungen/dl_wegleitung_baugesuch_und_beilagen.pdf" }
+  stand: 2026-10-03
+
+- id: LU-WEG-abz-fotos-fassaden
+  titel: Fotos der Aussenfassaden und Planunterlagen des bestehenden Gebäudes (Wohnbauten ausserhalb der Bauzonen)
+  scope: { kanton: LU }
+  when: { "and": [{ "==": [{ var: ausserhalb_bauzone }, true] }, { "==": [{ var: vorhabenstyp }, "umbau_anbau"] }] }
+  requires:
+    typ: dokument
+    dokument: Fotos Aussenfassaden
+  check: manuell
+  schwere: fehlt_blockierend
+  quelle: { erlass: "rawi-Wegleitung Baugesuch und Beilagen (Stand Juli 2026)", paragraph: "Ziff. 1.2.2.1", url: "https://rawi.lu.ch/-/media/RAWI/Dokumente/Baubewilligungen/dl_wegleitung_baugesuch_und_beilagen.pdf" }
+  stand: 2026-10-03

@@ -71,9 +71,14 @@ def extract_merkmale(
         wert = m.wert.get("wert") if sicher else None
         if isinstance(wert, str):
             wert = wert.strip() or None
+        status = m.status.value
+        vorhanden = m.wert["vorhanden"] if sicher else None
+        if vorhanden == "ja" and wert is None and _config()["merkmale"][name]["mit_wert"]:
+            # «vorhanden» ohne lesbaren Wert: im Zweifel nie als vorhanden werten
+            status, vorhanden = Befund.UNSICHER.value, None
         result[name] = {
-            "status": m.status.value,
-            "vorhanden": m.wert["vorhanden"] if sicher else None,
+            "status": status,
+            "vorhanden": vorhanden,
             "wert": wert,
             "stimmen": m.stimmen,
             "einstimmig": m.einstimmig,

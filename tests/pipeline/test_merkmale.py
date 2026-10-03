@@ -58,6 +58,21 @@ def test_mapping_per_plantyp() -> None:
     assert out["datum"]["wert"] is None
 
 
+@pytest.mark.parametrize("leer", ["   ", None, ""])
+def test_ja_ohne_wert_ist_unsicher(leer: str | None) -> None:
+    ja_leer = [{"vorhanden": "ja", "wert": leer}] * 3
+    client = FakeLLMClient(
+        responses=ja_leer * 3 + [{"vorhanden": "ja"}] * 6,
+        model="fake-1",
+    )
+    out = extract_merkmale(Plantyp.SITUATIONSPLAN, b"png", client=client)
+    for name in ("massstab", "datum", "planverfasser"):
+        assert out[name]["status"] == "unsicher"
+        assert out[name]["vorhanden"] is None
+        assert out[name]["wert"] is None
+    assert out["unterschrift"]["vorhanden"] == "ja"
+
+
 def test_split_vote_is_unsicher() -> None:
     client = FakeLLMClient(
         responses=[{"vorhanden": "ja"}, {"vorhanden": "nein"}, {"vorhanden": "unklar"}],

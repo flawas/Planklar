@@ -8,6 +8,10 @@ def test_upgrade_und_downgrade(engine: Engine) -> None:
     with engine.begin() as conn:
         cfg.attributes["connection"] = conn
         command.upgrade(cfg, "head")
-        assert {"buero", "user"} <= set(inspect(conn).get_table_names())
+        assert {"buero", "user", "dossier", "dokument", "seite"} <= set(
+            inspect(conn).get_table_names()
+        )
         command.downgrade(cfg, "base")
-        assert not {"buero", "user"} & set(inspect(conn).get_table_names())
+        assert not {"buero", "user", "dossier", "dokument", "seite"} & set(
+            inspect(conn).get_table_names()
+        )

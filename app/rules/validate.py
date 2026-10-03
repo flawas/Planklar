@@ -51,7 +51,9 @@ def _scope_key(rule: dict[str, Any]) -> tuple[str, str | None]:
 
 def validate_catalog(root: Path) -> list[str]:
     """Gibt alle Fehler als Liste zurück; leer bedeutet gültig."""
-    validator = Draft202012Validator(_load_schema())
+    validator = Draft202012Validator(
+        _load_schema(), format_checker=Draft202012Validator.FORMAT_CHECKER
+    )
     errors: list[str] = []
     seen: dict[tuple[tuple[str, str | None], str], Path] = {}
     files = sorted([*root.rglob("*.yaml"), *root.rglob("*.yml")])

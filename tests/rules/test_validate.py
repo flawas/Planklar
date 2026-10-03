@@ -40,3 +40,8 @@ def test_real_catalog_is_valid() -> None:
 
 def test_missing_directory_exit_code() -> None:
     assert main(["/nonexistent/path"]) == 2
+
+
+def test_invalid_stand_date_reported() -> None:
+    errors = validate_catalog(FIXTURES / "invalid" / "invalid_stand_date")
+    assert any("stand" in e for e in errors)

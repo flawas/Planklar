@@ -1,6 +1,7 @@
 """Normalisierung der PDF-Formularfelder auf feste Schlüssel (Zuordnung als Daten je Kanton)."""
 
 import json
+import re
 from dataclasses import dataclass
 from enum import StrEnum
 from pathlib import Path
@@ -8,6 +9,7 @@ from pathlib import Path
 from app.pipeline.preprocess import extract_form_fields
 
 MAPS_DIR = Path(__file__).parent / "field_maps"
+_CANTON_RE = re.compile(r"[a-z]{2}")
 
 
 class FormKey(StrEnum):
@@ -28,7 +30,10 @@ def _norm(name: str) -> str:
 
 def load_field_map(canton: str, maps_dir: Path = MAPS_DIR) -> dict[str, str]:
     """Feldname (normalisiert) -> Schlüssel. Unbekannte Schlüssel sind ein Datenfehler."""
-    path = maps_dir / f"{canton.lower()}.json"
+    code = canton.lower()
+    if not _CANTON_RE.fullmatch(code):
+        raise ValueError(f"Ungültiger Kantonscode: {canton!r}")
+    path = maps_dir / f"{code}.json"
     data = json.loads(path.read_text(encoding="utf-8"))
     mapping: dict[str, str] = {}
     for key, names in data["felder"].items():

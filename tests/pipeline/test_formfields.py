@@ -51,3 +51,9 @@ def test_unknown_key_rejected(tmp_path: Path) -> None:
 @pytest.mark.parametrize("canton", ["lu", "sz"])
 def test_shipped_maps_load(canton: str) -> None:
     assert isinstance(load_field_map(canton), dict)
+
+
+@pytest.mark.parametrize("canton", ["../../x", "lu/../sz", "", "luz", "l", "l1"])
+def test_invalid_canton_rejected(tmp_path: Path, canton: str) -> None:
+    with pytest.raises(ValueError, match="Kantonscode"):
+        load_field_map(canton, tmp_path)

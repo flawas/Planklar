@@ -34,6 +34,7 @@ include = ["app*"]
 
 [tool.setuptools.package-data]
 "app.web" = ["templates/*.html", "static/*"]
+"app.pipeline" = ["field_maps/*.json"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
@@ -56,6 +57,3 @@ strict = true
 [[tool.mypy.overrides]]
 module = "app.pipeline.preprocess"
 disallow_untyped_calls = false
-
-[tool.setuptools.package-data]
-"app.pipeline" = ["field_maps/*.json"]

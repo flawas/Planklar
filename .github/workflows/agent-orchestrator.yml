@@ -20,17 +20,17 @@ concurrency:
 jobs:
   unblock:
     if: github.event_name != 'pull_request' || github.event.pull_request.merged == true
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     steps:
       - name: Secrets aus 1Password laden
-        uses: 1password/load-secrets-action@v2
+        uses: 1password/load-secrets-action@v5
         with:
           export-env: true
         env:
           OP_SERVICE_ACCOUNT_TOKEN: ${{ secrets.OP_SERVICE_ACCOUNT_TOKEN }}
           AGENT_PAT: op://Github Actions/GitHub Agent PAT/Anmeldedaten
           CLAUDE_CODE_OAUTH_TOKEN: op://Github Actions/Claude OAUTH Token/Anmeldedaten
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - name: Freigeben
         env:
           GH_TOKEN: ${{ env.AGENT_PAT }}

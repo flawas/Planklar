@@ -22,18 +22,18 @@ jobs:
     if: >
       startsWith(github.event.pull_request.head.ref, 'agent/') &&
       github.event.action != 'labeled'
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 20
     steps:
       - name: Secrets aus 1Password laden
-        uses: 1password/load-secrets-action@v2
+        uses: 1password/load-secrets-action@v5
         with:
           export-env: true
         env:
           OP_SERVICE_ACCOUNT_TOKEN: ${{ secrets.OP_SERVICE_ACCOUNT_TOKEN }}
           AGENT_PAT: op://Github Actions/GitHub Agent PAT/Anmeldedaten
           CLAUDE_CODE_OAUTH_TOKEN: op://Github Actions/Claude OAUTH Token/Anmeldedaten
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
         with:
           fetch-depth: 0
           token: ${{ env.AGENT_PAT }}
@@ -59,18 +59,18 @@ jobs:
       github.event.action == 'labeled' &&
       github.event.label.name == 'review:changes-requested' &&
       startsWith(github.event.pull_request.head.ref, 'agent/')
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 45
     steps:
       - name: Secrets aus 1Password laden
-        uses: 1password/load-secrets-action@v2
+        uses: 1password/load-secrets-action@v5
         with:
           export-env: true
         env:
           OP_SERVICE_ACCOUNT_TOKEN: ${{ secrets.OP_SERVICE_ACCOUNT_TOKEN }}
           AGENT_PAT: op://Github Actions/GitHub Agent PAT/Anmeldedaten
           CLAUDE_CODE_OAUTH_TOKEN: op://Github Actions/Claude OAUTH Token/Anmeldedaten
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
         with:
           ref: ${{ github.event.pull_request.head.ref }}
           fetch-depth: 0
@@ -115,10 +115,10 @@ jobs:
       github.event.label.name == 'review:approved' &&
       vars.AUTO_MERGE == 'true' &&
       startsWith(github.event.pull_request.head.ref, 'agent/')
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     steps:
       - name: Secrets aus 1Password laden
-        uses: 1password/load-secrets-action@v2
+        uses: 1password/load-secrets-action@v5
         with:
           export-env: true
         env:

@@ -19,18 +19,18 @@ permissions:
 jobs:
   implement:
     if: github.event.label.name == 'status:ready'
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 45
     steps:
       - name: Secrets aus 1Password laden
-        uses: 1password/load-secrets-action@v2
+        uses: 1password/load-secrets-action@v5
         with:
           export-env: true
         env:
           OP_SERVICE_ACCOUNT_TOKEN: ${{ secrets.OP_SERVICE_ACCOUNT_TOKEN }}
           AGENT_PAT: op://Github Actions/GitHub Agent PAT/Anmeldedaten
           CLAUDE_CODE_OAUTH_TOKEN: op://Github Actions/Claude OAUTH Token/Anmeldedaten
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
         with:
           fetch-depth: 0
           token: ${{ env.AGENT_PAT }}
@@ -55,7 +55,7 @@ jobs:
 
       - name: Python-Umgebung (falls vorhanden)
         if: hashFiles('pyproject.toml') != ''
-        uses: actions/setup-python@v5
+        uses: actions/setup-python@v7
         with:
           python-version: "3.12"
 

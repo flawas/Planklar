@@ -11,13 +11,13 @@ permissions:
 jobs:
   detect:
     # hashFiles() ist auf Job-Ebene nicht erlaubt, daher Dateiprüfung per Shell.
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     outputs:
       python: ${{ steps.f.outputs.python }}
       rules: ${{ steps.f.outputs.rules }}
       docker: ${{ steps.f.outputs.docker }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - id: f
         run: |
           echo "python=$([ -f pyproject.toml ] && echo true || echo false)" >> "$GITHUB_OUTPUT"
@@ -27,7 +27,7 @@ jobs:
   python:
     needs: detect
     if: needs.detect.outputs.python == 'true'
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     services:
       postgres:
         image: postgres:16
@@ -42,8 +42,8 @@ jobs:
       DATABASE_URL: postgresql+psycopg://postgres:test@localhost:5432/test
       REDIS_URL: redis://localhost:6379/0
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v7
         with:
           python-version: "3.12"
           cache: pip
@@ -57,10 +57,10 @@ jobs:
   rules:
     needs: detect
     if: needs.detect.outputs.rules == 'true'
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v7
         with:
           python-version: "3.12"
           cache: pip
@@ -71,8 +71,8 @@ jobs:
   docker:
     needs: detect
     if: needs.detect.outputs.docker == 'true'
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - run: docker compose config -q
       - run: docker build -t planklar:ci .

@@ -10,7 +10,24 @@ The authoritative design is `Implementationsplan Baugesuch-Check.md` (scope, sta
 
 ## Status
 
-Source code does not exist yet; the backlog is built by the agent pipeline (see below). Once the scaffold lands, document build, lint and test commands here (expected: `pip install -e ".[dev]"`, `ruff check .`, `ruff format --check .`, `pytest`, `python -m app.rules.validate`, `docker compose up -d`).
+Das Gerüst steht (Issue #1); weitere Module entstehen über die Agent-Pipeline. Stack-Entscheidung: `docs/adr/0001-stack.md`.
+
+## Befehle
+
+```
+pip install -e ".[dev]"          # Python 3.12
+ruff check .                     # Lint
+ruff format --check .            # Format (ohne --check: formatieren)
+mypy                             # app/rules und app/pipeline
+pytest                           # Tests (tests/ spiegelt app/)
+uvicorn app.main:app --reload    # lokal starten, GET /health
+```
+
+Noch nicht vorhanden: `python -m app.rules.validate`, `docker compose up -d`.
+
+## Architektur
+
+Zielstruktur und Abhängigkeitsrichtung (`web -> dossiers/reports -> rules/pipeline -> db`) stehen in `.claude/agents/architect.md`. Konfiguration nur über Umgebungsvariablen (`app/config.py`).
 
 ## Domain rules (apply to every agent and every change)
 

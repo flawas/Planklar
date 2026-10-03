@@ -1,0 +1,50 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Planklar Regeldatei",
+  "description": "Eine Regeldatei ist eine Liste von Regeln.",
+  "type": "array",
+  "items": { "$ref": "#/$defs/regel" },
+  "$defs": {
+    "regel": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "titel", "scope", "when", "requires", "check", "schwere", "quelle", "stand"],
+      "properties": {
+        "id": { "type": "string", "pattern": "^[A-Za-z0-9][A-Za-z0-9_.-]*$" },
+        "titel": { "type": "string", "minLength": 1 },
+        "scope": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["kanton"],
+          "properties": {
+            "kanton": { "enum": ["LU", "SZ"] },
+            "gemeinde": { "type": "string", "minLength": 1 }
+          }
+        },
+        "when": {
+          "description": "Bedingung als JSON Logic.",
+          "type": ["object", "boolean"]
+        },
+        "requires": {
+          "type": "object",
+          "required": ["typ"],
+          "properties": { "typ": { "type": "string", "minLength": 1 } }
+        },
+        "check": { "enum": ["ki_klassifikation", "formularfeld", "plan_merkmal", "manuell"] },
+        "schwere": { "type": "string", "minLength": 1 },
+        "quelle": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["erlass", "paragraph", "url"],
+          "properties": {
+            "erlass": { "type": "string", "minLength": 1 },
+            "paragraph": { "type": "string", "minLength": 1 },
+            "url": { "type": "string", "pattern": "^https?://\\S+$" }
+          }
+        },
+        "stand": { "type": "string", "format": "date", "pattern": "^\\d{4}-\\d{2}-\\d{2}$" },
+        "disabled": { "type": "boolean" }
+      }
+    }
+  }
+}

@@ -6,7 +6,7 @@ from pathlib import Path
 
 import pymupdf
 
-from app.pipeline.preprocess import _open
+from app.pipeline.preprocess import open_pdf
 
 MM_PER_INCH = 25.4
 POINTS_PER_INCH = 72.0
@@ -90,7 +90,7 @@ def render_pages(
     config = config or RenderConfig()
     plantyp_by_page = plantyp_by_page or {}
     result: list[RenderedPage] = []
-    with _open(source) as doc:
+    with open_pdf(source) as doc:
         for index, page in enumerate(doc):
             number = index + 1
             dpi = config.dpi_for(plantyp_by_page.get(number))

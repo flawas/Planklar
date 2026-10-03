@@ -1,5 +1,8 @@
 # Kantonsbasis Luzern. Nur formelle Vollständigkeit der Beilagen, keine materielle Baurechtsprüfung.
 # Variablen in `when`: vorhabenstyp, gewaesserbezug, kantonsstrassenbezug, waldbezug, ausserhalb_bauzone.
+# Die vier Bezugsfelder (gewaesserbezug, kantonsstrassenbezug, waldbezug, ausserhalb_bauzone) und vorhabenstyp sind im
+# Vorhaben-Assistenten Pflichtangaben (ja/nein). Fehlt eine Angabe (null), gilt die Bedingung als nicht erfüllt; die Engine
+# muss den Prüflauf dann als `unsicher` führen statt die Regel still zu überspringen (Folgearbeit Engine).
 # Pläne (Grundriss bis Entwässerung) nur für Neubau und Umbau/Anbau; für Heizungsersatz sagt die Wegleitung nichts Belegtes.
 # Nicht abgedeckte Lücken: siehe PR zu Issue #24.
 

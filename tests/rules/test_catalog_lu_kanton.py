@@ -111,3 +111,10 @@ def test_ausserhalb_bauzone_nur_umbau() -> None:
     regel = "LU-WEG-abz-fotos-fassaden"
     assert regel in erwartet(vorhabenstyp="umbau_anbau", ausserhalb_bauzone=True)
     assert regel not in erwartet(vorhabenstyp="umbau_anbau", ausserhalb_bauzone=False)
+
+
+def test_fehlende_bezugsangabe_ist_dokumentiert() -> None:
+    """Unbekannte Angabe (None) lässt die Regel entfallen; der Katalog hält das fest."""
+    kopf = PATH.read_text(encoding="utf-8").split("\n- id:", 1)[0]
+    assert "Pflichtangaben" in kopf and "unsicher" in kopf
+    assert "LU-WEG-gewaesser-querprofil" not in erwartet(vorhabenstyp="neubau_efh_mfh")

@@ -23,7 +23,8 @@ pytest                           # Tests (tests/ spiegelt app/)
 uvicorn app.main:app --reload    # lokal starten, GET /health
 ```
 
-Noch nicht vorhanden: `python -m app.rules.validate`, `docker compose up -d`.
+`python -m app.rules.validate` validiert den Regelkatalog (`rules/`).
+Noch nicht vorhanden: `docker compose up -d`.
 
 ## Architektur
 

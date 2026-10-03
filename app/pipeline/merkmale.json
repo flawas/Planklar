@@ -1,0 +1,25 @@
+{
+  "merkmale": {
+    "massstab": {"prompt": "merkmal_massstab_v1", "mit_wert": true},
+    "datum": {"prompt": "merkmal_datum_v1", "mit_wert": true},
+    "planverfasser": {"prompt": "merkmal_planverfasser_v1", "mit_wert": true},
+    "unterschrift": {"prompt": "merkmal_unterschrift_v1", "mit_wert": false},
+    "nordpfeil": {"prompt": "merkmal_nordpfeil_v1", "mit_wert": false},
+    "legende_farbcodierung": {"prompt": "merkmal_legende_farbcodierung_v1", "mit_wert": false}
+  },
+  "plantyp": {
+    "Baugesuchsformular": ["unterschrift"],
+    "Situationsplan": ["massstab", "datum", "planverfasser", "unterschrift", "nordpfeil"],
+    "Grundriss": ["massstab", "datum", "planverfasser", "unterschrift", "nordpfeil", "legende_farbcodierung"],
+    "Schnitt": ["massstab", "datum", "planverfasser", "unterschrift", "legende_farbcodierung"],
+    "Fassade/Ansicht": ["massstab", "datum", "planverfasser", "unterschrift", "legende_farbcodierung"],
+    "Umgebungsplan": ["massstab", "datum", "planverfasser", "unterschrift", "nordpfeil"],
+    "Entwässerungsplan": ["massstab", "datum", "planverfasser", "unterschrift", "nordpfeil"],
+    "Katasterplan": ["massstab", "datum"],
+    "Grundbuchauszug": [],
+    "Baubeschrieb": [],
+    "Energienachweis": [],
+    "Deklaration Erdbebensicherheit": [],
+    "Sonstiges": []
+  }
+}

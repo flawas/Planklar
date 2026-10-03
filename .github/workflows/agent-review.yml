@@ -2,7 +2,7 @@ name: Agent – Review und Nachbesserung
 
 # 1) Neuer/aktualisierter Agent-PR  -> reviewer-Agent prüft und setzt ein review:*-Label
 # 2) Label review:changes-requested  -> Entwickler-Agent der PR-Rolle bessert nach (max. 3 Runden)
-# 3) Label review:approved           -> optional Auto-Merge (Repo-Variable AUTO_MERGE=true)
+# 3) Label review:approved           -> agent-merge.yml merged, sobald CI grün ist
 on:
   pull_request:
     types: [opened, synchronize, reopened, labeled]
@@ -108,24 +108,3 @@ jobs:
             --model claude-sonnet-5-5
             --max-turns 50
             --allowedTools "Read,Write,Edit,Glob,Grep,Bash"
-
-  automerge:
-    if: >
-      github.event.action == 'labeled' &&
-      github.event.label.name == 'review:approved' &&
-      vars.AUTO_MERGE == 'true' &&
-      startsWith(github.event.pull_request.head.ref, 'agent/')
-    runs-on: ubuntu-24.04
-    steps:
-      - name: Secrets aus 1Password laden
-        uses: 1password/load-secrets-action@v5
-        with:
-          export-env: true
-        env:
-          OP_SERVICE_ACCOUNT_TOKEN: ${{ secrets.OP_SERVICE_ACCOUNT_TOKEN }}
-          AGENT_PAT: op://Github Actions/GitHub Agent PAT/Anmeldedaten
-          CLAUDE_CODE_OAUTH_TOKEN: op://Github Actions/Claude OAUTH Token/Anmeldedaten
-      - name: Auto-Merge aktivieren (wartet auf grünes CI)
-        env:
-          GH_TOKEN: ${{ env.AGENT_PAT }}
-        run: gh pr merge ${{ github.event.pull_request.number }} --auto --squash --delete-branch --repo ${{ github.repository }}

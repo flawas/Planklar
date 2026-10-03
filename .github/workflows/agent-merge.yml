@@ -1,0 +1,54 @@
+name: Agent – Merge nach main
+
+# Merged PRs, die der Reviewer-Agent freigegeben hat und deren CI grün ist.
+# Ausschalten: Repo-Variable AUTO_MERGE=false (Settings > Variables).
+on:
+  pull_request:
+    types: [labeled]
+  workflow_run:
+    workflows: [CI]
+    types: [completed]
+  workflow_dispatch:
+  schedule:
+    - cron: "*/20 * * * *"   # Sicherheitsnetz: räumt freigegebene PRs auf, deren Trigger verpasst wurde
+
+permissions:
+  contents: read
+  pull-requests: read
+
+concurrency:
+  group: agent-merge
+  cancel-in-progress: false
+
+jobs:
+  merge:
+    if: >
+      vars.AUTO_MERGE != 'false' && (
+        (github.event_name == 'pull_request' && github.event.label.name == 'review:approved') ||
+        (github.event_name == 'workflow_run' && github.event.workflow_run.conclusion != 'cancelled') ||
+        github.event_name == 'workflow_dispatch' ||
+        github.event_name == 'schedule'
+      )
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - name: Secrets aus 1Password laden
+        uses: 1password/load-secrets-action@v5
+        with:
+          export-env: true
+        env:
+          OP_SERVICE_ACCOUNT_TOKEN: ${{ secrets.OP_SERVICE_ACCOUNT_TOKEN }}
+          AGENT_PAT: op://Github Actions/GitHub Agent PAT/Anmeldedaten
+      - uses: actions/checkout@v7
+      - name: Passende PRs ermitteln und mergen
+        env:
+          GH_TOKEN: ${{ env.AGENT_PAT }}
+          GH_REPO: ${{ github.repository }}
+          PR_FROM_LABEL: ${{ github.event.pull_request.number }}
+          PRS_FROM_CI: ${{ toJSON(github.event.workflow_run.pull_requests.*.number) }}
+        run: |
+          prs="$PR_FROM_LABEL"
+          if [ -z "$prs" ]; then prs=$(jq -r '.[]' <<<"$PRS_FROM_CI"); fi
+          # Kein PR aus dem Event (manuell, Zeitplan, CI auf main): alle freigegebenen offenen PRs prüfen
+          if [ -z "$prs" ]; then prs=$(gh pr list --state open --label review:approved --json number -q '.[].number'); fi
+          for pr in $prs; do bash .github/scripts/merge-if-ready.sh "$pr"; done

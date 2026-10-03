@@ -1,5 +1,6 @@
 # Kantonsbasis Luzern. Nur formelle Vollständigkeit der Beilagen, keine materielle Baurechtsprüfung.
 # Variablen in `when`: vorhabenstyp, gewaesserbezug, kantonsstrassenbezug, waldbezug, ausserhalb_bauzone.
+# Pläne (Grundriss bis Entwässerung) nur für Neubau und Umbau/Anbau; für Heizungsersatz sagt die Wegleitung nichts Belegtes.
 # Nicht abgedeckte Lücken: siehe PR zu Issue #24.
 
 - id: LU-PBV55-1-baugesuchsformular
@@ -42,7 +43,7 @@
 - id: LU-PBV55-2b-grundriss
   titel: Grundrisspläne aller Geschosse (Mindestmassstab 1:100)
   scope: { kanton: LU }
-  when: true
+  when: { "in": [{ var: vorhabenstyp }, ["neubau_efh_mfh", "umbau_anbau"]] }
   requires:
     typ: dokument
     dokument: Grundriss
@@ -54,7 +55,7 @@
 - id: LU-PBV55-2b-fassade
   titel: Fassadenpläne (Mindestmassstab 1:100)
   scope: { kanton: LU }
-  when: true
+  when: { "in": [{ var: vorhabenstyp }, ["neubau_efh_mfh", "umbau_anbau"]] }
   requires:
     typ: dokument
     dokument: Fassade/Ansicht
@@ -66,7 +67,7 @@
 - id: LU-PBV55-2b-schnitt
   titel: Schnittpläne (Mindestmassstab 1:100)
   scope: { kanton: LU }
-  when: true
+  when: { "in": [{ var: vorhabenstyp }, ["neubau_efh_mfh", "umbau_anbau"]] }
   requires:
     typ: dokument
     dokument: Schnitt
@@ -78,7 +79,7 @@
 - id: LU-PBV55-2c-umgebungsplan
   titel: Umgebungsplan 1:100
   scope: { kanton: LU }
-  when: true
+  when: { "in": [{ var: vorhabenstyp }, ["neubau_efh_mfh", "umbau_anbau"]] }
   requires:
     typ: dokument
     dokument: Umgebungsplan
@@ -90,7 +91,7 @@
 - id: LU-PBV55-2e-entwaesserungsplan
   titel: Pläne für die Abwasseranlagen (Entwässerungs- und Kanalisationsplan) 1:100
   scope: { kanton: LU }
-  when: true
+  when: { "in": [{ var: vorhabenstyp }, ["neubau_efh_mfh", "umbau_anbau"]] }
   requires:
     typ: dokument
     dokument: Entwässerungsplan

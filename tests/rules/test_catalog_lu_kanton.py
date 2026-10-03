@@ -1,7 +1,6 @@
 """Szenario-Tests für rules/LU/kanton.yaml (formelle Beilagen, keine Baurechtsprüfung)."""
 
 import re
-from pathlib import Path
 from typing import Any
 
 import pytest
@@ -22,6 +21,14 @@ GRUNDSET = {
     "LU-PBV55-2c-umgebungsplan",
     "LU-PBV55-2e-entwaesserungsplan",
     "LU-PBV55-5-beilagenverzeichnis",
+}
+
+PLAENE = {
+    "LU-PBV55-2b-grundriss",
+    "LU-PBV55-2b-fassade",
+    "LU-PBV55-2b-schnitt",
+    "LU-PBV55-2c-umgebungsplan",
+    "LU-PBV55-2e-entwaesserungsplan",
 }
 
 
@@ -84,6 +91,7 @@ def test_umbau_farbkennzeichnung() -> None:
 def test_heizungsersatz_hat_formular_und_situation() -> None:
     ids = erwartet(vorhabenstyp="heizungsersatz_waermepumpe")
     assert {"LU-PBV55-1-baugesuchsformular", "LU-PBV55-2a-situationsplan"} <= ids
+    assert not PLAENE & ids
 
 
 @pytest.mark.parametrize(
@@ -103,7 +111,3 @@ def test_ausserhalb_bauzone_nur_umbau() -> None:
     regel = "LU-WEG-abz-fotos-fassaden"
     assert regel in erwartet(vorhabenstyp="umbau_anbau", ausserhalb_bauzone=True)
     assert regel not in erwartet(vorhabenstyp="umbau_anbau", ausserhalb_bauzone=False)
-
-
-def test_yaml_is_in_repo() -> None:
-    assert Path(PATH).is_file()

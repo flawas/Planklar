@@ -38,8 +38,6 @@ def test_mapping_per_plantyp() -> None:
     assert "legende_farbcodierung" in merkmale_fuer("Grundriss")
     assert merkmale_fuer(Plantyp.GRUNDBUCHAUSZUG) == ()
 
-    answers = [{"vorhanden": "ja", "wert": " 1:100 "}] * 3
-    client = FakeLLMClient(responses=answers * 1, model="fake-1")
     out = extract_merkmale(
         Plantyp.KATASTERPLAN.value,
         b"png",

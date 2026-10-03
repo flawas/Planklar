@@ -33,6 +33,7 @@ RUN groupadd --system --gid 10001 planklar \
 COPY --from=builder /opt/venv /opt/venv
 
 WORKDIR /srv
+COPY --chown=planklar:planklar alembic.ini ./alembic.ini
 COPY --chown=planklar:planklar app ./app
 # Regelkatalog im Image, damit Image-Tag und Regelstand zusammenpassen; per Volume überschreibbar.
 COPY --chown=planklar:planklar rules ./rules

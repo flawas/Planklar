@@ -1,0 +1,5 @@
+# SITE_ADDRESS: ":80" lokal/CI, in Produktion der Hostname (Caddy holt dann automatisch TLS).
+{$SITE_ADDRESS::80} {
+	encode gzip
+	reverse_proxy web:8000
+}

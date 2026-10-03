@@ -3,7 +3,7 @@
 # Aufruf: merge-if-ready.sh <pr-nummer>      (GH_TOKEN = AGENT_PAT, damit der Merge Folge-Workflows auslöst)
 # Gates: offen, kein Draft, gleiches Repo, Branch agent/*, Label review:approved (gilt nur für den
 # letzten Commit, weil agent-review.yml es bei jedem Push entfernt), kein needs-human,
-# keine Konflikte, CI-Workflow vollständig grün.
+# keine Konflikte (Auflösung: resolve-conflicts.sh), CI-Workflow vollständig grün.
 set -euo pipefail
 pr="$1"
 
@@ -28,11 +28,9 @@ skip() { echo "PR #$pr: übersprungen – $1"; exit 0; }
 [[ ",$labels," != *",needs-human,"* ]]         || skip "needs-human"
 [[ ",$labels," != *",review:changes-requested,"* ]] || skip "Änderungen angefordert"
 
-if [ "$(jq -r .mergeable <<<"$j")" = "CONFLICTING" ]; then
-  gh pr edit "$pr" --add-label needs-human
-  gh pr comment "$pr" --body "Merge-Konflikt mit main. Bitte manuell auflösen."
-  skip "Konflikt"
-fi
+# Konflikte löst der Job "resolve-conflicts" in agent-merge.yml (resolve-conflicts.sh); danach
+# läuft das Review neu und der PR kommt hier wieder vorbei. needs-human setzt jener Job bei Misserfolg.
+[ "$(jq -r .mergeable <<<"$j")" != "CONFLICTING" ] || skip "Konflikt mit main, wird separat aufgelöst"
 
 # Nur der CI-Workflow zählt (die Agent-Workflows selbst laufen auf demselben PR).
 checks=$(gh pr checks "$pr" --json workflow,bucket 2>/dev/null || echo '[]')

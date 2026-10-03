@@ -65,6 +65,9 @@ def test_log_event_rejects_free_text() -> None:
         log_event("x", content=b"%PDF-1.7")
     with pytest.raises(ValueError):
         log_event("x", error_code="Freitext mit Leerzeichen")
+    for key in ("valid", "paid", "void", "barcode"):
+        with pytest.raises(ValueError):
+            log_event("x", **{key: "Muster"})
 
 
 def test_log_event_accepts_ids_and_codes(caplog: pytest.LogCaptureFixture) -> None:

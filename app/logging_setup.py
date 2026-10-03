@@ -13,7 +13,7 @@ from fastapi.responses import JSONResponse
 
 LOGGER_NAME = "planklar"
 _CODE = re.compile(r"^[A-Za-z0-9_.:-]{1,64}$")
-_CODE_KEYS = ("_id", "_code", "code", "id")
+_CODE_KEY = re.compile(r"^(?:id|code|[a-z0-9_]+_(?:id|code))$")
 
 request_id_var: ContextVar[str | None] = ContextVar("request_id", default=None)
 
@@ -57,7 +57,7 @@ def _check(key: str, value: object) -> object:
         return value
     if isinstance(value, uuid.UUID):
         return str(value)
-    if isinstance(value, str) and key.endswith(_CODE_KEYS) and _CODE.fullmatch(value):
+    if isinstance(value, str) and _CODE_KEY.fullmatch(key) and _CODE.fullmatch(value):
         return value
     raise ValueError(f"log_event: Feld '{key}' erlaubt nur IDs, Codes und Zahlen")
 
@@ -75,32 +75,34 @@ def install_request_logging(app: FastAPI) -> None:
     async def _log_requests(request: Request, call_next: Any) -> Response:
         request_id = str(uuid.uuid4())
         token = request_id_var.set(request_id)
-        start = time.perf_counter()
-        error_code: str | None = None
         try:
-            response: Response = await call_next(request)
-        except Exception as exc:  # Nachricht bewusst nicht loggen (Nutzerdaten)
-            error_code = "internal_error"
+            start = time.perf_counter()
+            error_code: str | None = None
+            try:
+                response: Response = await call_next(request)
+            except Exception as exc:  # Nachricht bewusst nicht loggen (Nutzerdaten)
+                error_code = "internal_error"
+                log_event(
+                    "unhandled_exception",
+                    level=logging.ERROR,
+                    error_code=error_code,
+                    exception_code=re.sub(r"[^A-Za-z0-9_.:-]", "_", type(exc).__name__)[:64],
+                )
+                response = JSONResponse(
+                    {"error_code": error_code, "request_id": request_id}, status_code=500
+                )
+            else:
+                if response.status_code >= 400:
+                    error_code = f"http_{response.status_code}"
+            duration_ms = round((time.perf_counter() - start) * 1000, 2)
             log_event(
-                "unhandled_exception",
-                level=logging.ERROR,
-                error_code=error_code,
-                exception_code=type(exc).__name__.replace(" ", "_"),
+                "request",
+                method_code=request.method,
+                status=response.status_code,
+                duration_ms=duration_ms,
+                **({"error_code": error_code} if error_code else {}),
             )
-            response = JSONResponse(
-                {"error_code": error_code, "request_id": request_id}, status_code=500
-            )
-        else:
-            if response.status_code >= 400:
-                error_code = f"http_{response.status_code}"
-        duration_ms = round((time.perf_counter() - start) * 1000, 2)
-        log_event(
-            "request",
-            method_code=request.method,
-            status=response.status_code,
-            duration_ms=duration_ms,
-            **({"error_code": error_code} if error_code else {}),
-        )
-        response.headers["X-Request-ID"] = request_id
-        request_id_var.reset(token)
-        return response
+            response.headers["X-Request-ID"] = request_id
+            return response
+        finally:
+            request_id_var.reset(token)

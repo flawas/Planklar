@@ -1,0 +1,10 @@
+- id: TEST-LU-basis
+  titel: Beispielregel Gemeinde (Override)
+  scope: { kanton: LU, gemeinde: Beispielhausen }
+  when: true
+  requires: { typ: dokument, dokument: situationsplan }
+  check: manuell
+  schwere: hinweis
+  quelle: { erlass: "Beispiel-Reglement", paragraph: "Art. 2", url: "https://example.org/reglement" }
+  stand: 2026-03-01
+  disabled: true

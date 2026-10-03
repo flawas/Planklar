@@ -1,0 +1,10 @@
+# Synthetisches Beispiel, nicht Teil des echten Katalogs.
+- id: TEST-LU-basis
+  titel: Beispielregel Kanton
+  scope: { kanton: LU }
+  when: true
+  requires: { typ: dokument, dokument: situationsplan }
+  check: ki_klassifikation
+  schwere: fehlt_blockierend
+  quelle: { erlass: "Beispiel-Erlass", paragraph: "§ 1", url: "https://example.org/erlass" }
+  stand: 2026-02-01

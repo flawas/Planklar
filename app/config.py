@@ -1,4 +1,5 @@
 from functools import lru_cache
+from typing import Literal
 
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
@@ -19,6 +20,14 @@ class Settings(BaseSettings):
     llm_model: str = ""
     llm_api_key: str = ""
     retention_days: int = 30
+    auth_secret: str = ""
+    auth_cookie_secure: bool = True
+    auth_cookie_samesite: Literal["lax", "strict", "none"] = "lax"
+    auth_session_seconds: int = 8 * 3600
+    oidc_enabled: bool = False
+    oidc_issuer: str = ""
+    oidc_client_id: str = ""
+    oidc_client_secret: str = ""
 
 
 @lru_cache

@@ -17,6 +17,7 @@ class Settings(BaseSettings):
     s3_bucket: str = "planklar"
     s3_region: str = "us-east-1"
     signed_url_ttl_seconds: int = 300
+    max_upload_bytes: int = 100 * 1024 * 1024
     llm_model: str = ""
     llm_api_key: str = ""
     retention_days: int = 30

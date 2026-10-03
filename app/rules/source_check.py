@@ -110,10 +110,12 @@ def main(argv: Iterable[str] | None = None, fetcher: Fetcher = fetch) -> int:
     findings, current = check(urls, stored, fetcher)
 
     if args.update:
+        # Fehlgeschlagene Abrufe behalten ihren bisherigen Referenzstand.
+        merged = {u: stored[u] for u in urls if u in stored} | current
         args.hash_file.write_text(
-            json.dumps(current, indent=2, sort_keys=True) + "\n", encoding="utf-8"
+            json.dumps(merged, indent=2, sort_keys=True) + "\n", encoding="utf-8"
         )
-        print(f"{len(current)} Hashes nach {args.hash_file} geschrieben")
+        print(f"{len(merged)} Hashes nach {args.hash_file} geschrieben")
         return 1 if findings["fehler"] else 0
 
     if not any(findings.values()):

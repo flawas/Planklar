@@ -91,6 +91,18 @@ def test_update_writes_hashes(tmp_path: Path) -> None:
     }
 
 
+def test_update_keeps_stored_hash_of_failed_url(tmp_path: Path) -> None:
+    def fetcher(url: str) -> bytes:
+        if url.endswith("/a"):
+            raise OSError("down")
+        return b"1"
+
+    assert _run(tmp_path, {"https://x.ch/a": "alt"}, fetcher, "--update") == 1
+    saved = json.loads((tmp_path / "h.json").read_text())
+    assert saved["https://x.ch/a"] == "alt"
+    assert set(saved) == {"https://x.ch/a", "https://x.ch/c"}
+
+
 def test_workflow_is_only_network_user() -> None:
     wf = (ROOT / ".github/workflows/rules-source-check.yml").read_text()
     assert "schedule:" in wf and "workflow_dispatch:" in wf

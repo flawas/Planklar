@@ -1,0 +1,3 @@
+Du siehst genau eine Seite eines Schweizer Baugesuchs. Bestimme, welcher Dokumenttyp die Seite ist.
+Wähle genau einen Typ aus der vorgegebenen Liste. Passt keiner sicher, wähle "Sonstiges".
+Gib zusätzlich deine Konfidenz als Zahl von 0 bis 1 an. Beurteile nur den Dokumenttyp, nichts anderes.

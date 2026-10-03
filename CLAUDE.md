@@ -25,6 +25,7 @@ celery -A app.worker worker --concurrency=2   # Worker (Broker: REDIS_URL)
 ```
 
 `python -m app.rules.validate` validiert den Regelkatalog (`rules/`).
+`python -m eval.run --model <name>` lässt das Evaluations-Harness laufen (manuell/wöchentlich, nie im PR-CI; Set in `eval/data/`).
 Noch nicht vorhanden: `docker compose up -d`.
 
 ## Architektur

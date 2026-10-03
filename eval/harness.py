@@ -15,6 +15,7 @@ from typing import Any
 
 from app.pipeline.classify import classify_page
 from app.pipeline.llm import LLMClient
+from app.pipeline.merkmale import _config as _merkmale_config
 from app.pipeline.merkmale import extract_merkmale
 from app.pipeline.plantyp import Plantyp
 
@@ -78,6 +79,21 @@ class Result:
         return bool(self.seiten) and all(self.gates().values())
 
 
+def _validate_merkmale(raw: Any) -> dict[str, dict[str, Any]]:
+    """Annotationen strikt prüfen: ein Tippfehler darf das Gate nicht verfälschen."""
+    if not isinstance(raw, dict):
+        raise ValueError("merkmale")
+    known = _merkmale_config()["merkmale"]
+    for name, ann in raw.items():
+        if name not in known or not isinstance(ann, dict):
+            raise ValueError("merkmal")
+        if ann.get("vorhanden") not in ("ja", "nein"):
+            raise ValueError("vorhanden")
+        if "wert" in ann and ann["vorhanden"] != "ja":
+            raise ValueError("wert")
+    return {name: dict(ann) for name, ann in raw.items()}
+
+
 def load_seiten(directory: Path) -> list[Seite]:
     files = sorted(directory.glob("*.json"))
     seiten: list[Seite] = []
@@ -91,7 +107,7 @@ def load_seiten(directory: Path) -> list[Seite]:
                         id=str(entry["id"]),
                         bild=bild,
                         plantyp=Plantyp(entry["plantyp"]),
-                        merkmale=dict(entry.get("merkmale", {})),
+                        merkmale=_validate_merkmale(entry.get("merkmale", {})),
                         text=str(entry.get("text", "")),
                     )
                 )

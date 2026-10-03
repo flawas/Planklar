@@ -125,6 +125,23 @@ def test_empty_or_broken_set_is_error(tmp_path: Path) -> None:
         load_seiten(tmp_path)
 
 
+@pytest.mark.parametrize(
+    "merkmale",
+    [
+        {"massstab": {}},
+        {"massstab": {"vorhanden": "Ja"}},
+        {"massstab": {"vorhanden": "unklar"}},
+        {"massstab": {"vorhanden": "nein", "wert": "1:100"}},
+        {"unbekannt": {"vorhanden": "ja"}},
+        ["massstab"],
+    ],
+)
+def test_invalid_merkmal_annotation_is_data_error(tmp_path: Path, merkmale: Any) -> None:
+    write_set(tmp_path, {"p1": {"plantyp": "Grundriss", "merkmale": merkmale}})
+    with pytest.raises(DataError):
+        load_seiten(tmp_path)
+
+
 def test_cli_writes_reports_and_exit_code(data: Path, tmp_path: Path) -> None:
     out = tmp_path / "out"
     code = run.main(

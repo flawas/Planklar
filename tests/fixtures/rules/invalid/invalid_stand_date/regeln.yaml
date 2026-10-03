@@ -1,0 +1,12 @@
+# Synthetisches Beispiel, nicht Teil des echten Katalogs.
+- id: TEST-schattendiagramm
+  titel: Schattendiagramm bei Hochhäusern (Beispiel)
+  scope: { kanton: SZ }
+  when: { "==": [{ var: gebaeudetyp }, "hochhaus"] }
+  requires:
+    typ: dokument
+    dokument: schattendiagramm
+  check: ki_klassifikation
+  schwere: fehlt_blockierend
+  quelle: { erlass: "Beispiel-Erlass", paragraph: "§ 1", url: "https://example.org/erlass" }
+  stand: "2026-13-45"

@@ -1,0 +1,119 @@
+name: Agent – Merge nach main
+
+# Merged PRs, die der Reviewer-Agent freigegeben hat und deren CI grün ist.
+# Ausschalten: Repo-Variable AUTO_MERGE=false (Settings > Variables).
+on:
+  pull_request:
+    types: [labeled]
+  workflow_run:
+    workflows: [CI]
+    types: [completed]
+  workflow_dispatch:
+  schedule:
+    - cron: "*/20 * * * *"   # Sicherheitsnetz: räumt freigegebene PRs auf, deren Trigger verpasst wurde
+
+permissions:
+  contents: read
+  pull-requests: read
+
+concurrency:
+  group: agent-merge
+  cancel-in-progress: false
+
+jobs:
+  merge:
+    if: >
+      vars.AUTO_MERGE != 'false' && (
+        (github.event_name == 'pull_request' && github.event.label.name == 'review:approved') ||
+        (github.event_name == 'workflow_run' && github.event.workflow_run.conclusion != 'cancelled') ||
+        github.event_name == 'workflow_dispatch' ||
+        github.event_name == 'schedule'
+      )
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - name: Secrets aus 1Password laden
+        uses: 1password/load-secrets-action@v5
+        with:
+          export-env: true
+        env:
+          OP_SERVICE_ACCOUNT_TOKEN: ${{ secrets.OP_SERVICE_ACCOUNT_TOKEN }}
+          AGENT_PAT: op://Github Actions/GitHub Agent PAT/Anmeldedaten
+      - uses: actions/checkout@v7
+      - name: Passende PRs ermitteln und mergen
+        env:
+          GH_TOKEN: ${{ env.AGENT_PAT }}
+          GH_REPO: ${{ github.repository }}
+          PR_FROM_LABEL: ${{ github.event.pull_request.number }}
+          PRS_FROM_CI: ${{ toJSON(github.event.workflow_run.pull_requests.*.number) }}
+        run: |
+          prs="$PR_FROM_LABEL"
+          if [ -z "$prs" ]; then prs=$(jq -r '.[]' <<<"$PRS_FROM_CI"); fi
+          # Kein PR aus dem Event (manuell, Zeitplan, CI auf main): alle freigegebenen offenen PRs prüfen
+          if [ -z "$prs" ]; then prs=$(gh pr list --state open --label review:approved --json number -q '.[].number'); fi
+          for pr in $prs; do bash .github/scripts/merge-if-ready.sh "$pr"; done
+
+  # Konflikte mit main (typisch: pyproject.toml) selbst lösen. Das LLM darf nur Konfliktmarker in den
+  # Dateien der Allowlist in resolve-conflicts.sh auflösen; alles andere geht an needs-human.
+  # Nach dem Push läuft das Review neu (review:approved gilt nur für den letzten Commit).
+  resolve-conflicts:
+    needs: merge
+    if: always() && needs.merge.result != 'cancelled' && vars.AUTO_MERGE != 'false'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - name: Secrets aus 1Password laden
+        uses: 1password/load-secrets-action@v5
+        with:
+          export-env: true
+        env:
+          OP_SERVICE_ACCOUNT_TOKEN: ${{ secrets.OP_SERVICE_ACCOUNT_TOKEN }}
+          AGENT_PAT: op://Github Actions/GitHub Agent PAT/Anmeldedaten
+          CLAUDE_CODE_OAUTH_TOKEN: op://Github Actions/Claude OAUTH Token/Anmeldedaten
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+          token: ${{ env.AGENT_PAT }}
+      - uses: actions/setup-python@v7
+        with:
+          python-version: "3.12"
+      - name: Konflikt-PR vorbereiten (main einmergen)
+        id: prep
+        env:
+          GH_TOKEN: ${{ env.AGENT_PAT }}
+          GH_REPO: ${{ github.repository }}
+        run: bash .github/scripts/resolve-conflicts.sh prepare
+      - name: Konflikt auflösen
+        if: steps.prep.outputs.pr != ''
+        uses: anthropics/claude-code-action@v1
+        with:
+          claude_code_oauth_token: ${{ env.CLAUDE_CODE_OAUTH_TOKEN }}
+          github_token: ${{ env.AGENT_PAT }}
+          prompt: |
+            Im Arbeitsverzeichnis läuft ein `git merge origin/main` mit Konflikten in: ${{ steps.prep.outputs.files }}.
+            Löse ausschliesslich die Konfliktmarker (<<<<<<<, =======, >>>>>>>) in diesen Dateien.
+            Regeln für pyproject.toml:
+            - Beide Seiten behalten: Dependencies, optionale Dependencies, Tool-Sektionen von main UND vom PR vereinen.
+            - Bei derselben Dependency mit verschiedenen Versionsgrenzen die strengere (höhere Untergrenze) nehmen.
+            - Doppelte Einträge und doppelte TOML-Tabellen vermeiden, Sortierung und Stil der Datei beibehalten.
+            - Nichts hinzufügen, was auf keiner Seite stand. Keine anderen Dateien ändern.
+            Prüfe mit `python -c "import tomllib;tomllib.load(open('pyproject.toml','rb'))"`.
+            Nicht committen, nicht pushen, kein `git add`: das macht das Skript danach.
+          claude_args: |
+            --model claude-sonnet-5-5
+            --max-turns 15
+            --allowedTools "Read,Edit,Grep,Bash(python:*),Bash(git diff:*),Bash(git show:*)"
+      - name: Ergebnis prüfen, committen, pushen
+        if: steps.prep.outputs.pr != ''
+        env:
+          GH_TOKEN: ${{ env.AGENT_PAT }}
+          GH_REPO: ${{ github.repository }}
+        run: bash .github/scripts/resolve-conflicts.sh finish "${{ steps.prep.outputs.pr }}" "${{ steps.prep.outputs.branch }}"
+      - name: Bei Fehlschlag markieren
+        if: failure() && steps.prep.outputs.pr != ''
+        env:
+          GH_TOKEN: ${{ env.AGENT_PAT }}
+          GH_REPO: ${{ github.repository }}
+        run: |
+          gh pr edit "${{ steps.prep.outputs.pr }}" --add-label needs-human || true
+          gh pr comment "${{ steps.prep.outputs.pr }}" --body "Automatische Konfliktauflösung fehlgeschlagen: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}" || true

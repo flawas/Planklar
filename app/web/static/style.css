@@ -1,0 +1,18 @@
+:root { --text: #1a1a1a; --grund: #fff; --akzent: #0b5394; --fehler: #9b1c1c; --rand: #767676; }
+* { box-sizing: border-box; }
+body { margin: 0; font: 1rem/1.5 system-ui, sans-serif; color: var(--text); background: var(--grund);
+  min-height: 100vh; display: flex; flex-direction: column; }
+main { flex: 1; width: min(100% - 2rem, 40rem); margin: 2rem auto; }
+.kopf, .fuss { padding: .75rem 1rem; background: #f0f0f0; display: flex; justify-content: space-between;
+  align-items: center; }
+.marke { font-weight: 700; color: var(--akzent); text-decoration: none; }
+.skip { position: absolute; left: -999px; }
+.skip:focus { left: 1rem; top: 1rem; background: var(--grund); padding: .5rem; }
+.abmelden { display: flex; gap: .75rem; align-items: center; }
+.formular { display: grid; gap: .5rem; max-width: 24rem; }
+input { padding: .5rem; border: 1px solid var(--rand); border-radius: 4px; font: inherit; }
+button { padding: .5rem 1rem; border: 0; border-radius: 4px; background: var(--akzent); color: #fff;
+  font: inherit; cursor: pointer; }
+:focus-visible { outline: 3px solid #f5a623; outline-offset: 2px; }
+.fehler { color: var(--fehler); border-left: 4px solid var(--fehler); padding: .5rem .75rem;
+  background: #fdf0f0; }

@@ -1,13 +1,22 @@
 import uuid
 
 from fastapi import APIRouter, Depends, HTTPException, UploadFile, status
+from fastapi.exceptions import RequestValidationError
+from pydantic import ValidationError
 from sqlalchemy.orm import Session
 
 from app.auth.users import current_user
 from app.config import get_settings
-from app.db.models import Dokument, User
+from app.db.models import Dokument, Dossier, User
 from app.db.session import get_session
-from app.dossiers.schemas import DokumentRead
+from app.dossiers.schemas import (
+    DokumentRead,
+    DossierCreate,
+    DossierRead,
+    DossierUpdate,
+    validate_attribute,
+)
+from app.dossiers.scope import BueroScope, NotFoundError, get_scope, not_found
 from app.dossiers.service import (
     DossierNotFoundError,
     UploadError,
@@ -27,6 +36,50 @@ _STATUS = {
     "PDF_ENCRYPTED": status.HTTP_422_UNPROCESSABLE_CONTENT,
     "DUPLICATE": status.HTTP_409_CONFLICT,
 }
+
+
+@dossier_router.get("", response_model=list[DossierRead])
+def list_dossiers(scope: BueroScope = Depends(get_scope)) -> list[Dossier]:
+    return list(scope.list_dossiers())
+
+
+@dossier_router.post("", response_model=DossierRead, status_code=status.HTTP_201_CREATED)
+def create_dossier(body: DossierCreate, scope: BueroScope = Depends(get_scope)) -> Dossier:
+    dossier = scope.add_dossier(**body.model_dump())
+    scope.session.commit()
+    return dossier
+
+
+@dossier_router.get("/{dossier_id}", response_model=DossierRead)
+def read_dossier(dossier_id: uuid.UUID, scope: BueroScope = Depends(get_scope)) -> Dossier:
+    try:
+        return scope.get_dossier(dossier_id)
+    except NotFoundError:
+        raise not_found() from None
+
+
+@dossier_router.patch("/{dossier_id}", response_model=DossierRead)
+def update_dossier(
+    dossier_id: uuid.UUID, body: DossierUpdate, scope: BueroScope = Depends(get_scope)
+) -> Dossier:
+    try:
+        dossier = scope.get_dossier(dossier_id)
+    except NotFoundError:
+        raise not_found() from None
+    fields = body.model_dump(exclude_unset=True)
+    typ = fields.get("vorhabenstyp", dossier.vorhabenstyp)
+    if "attribute" in fields or "vorhabenstyp" in fields:
+        try:
+            fields["attribute"] = validate_attribute(
+                typ, fields.get("attribute", dossier.attribute)
+            )
+        except ValidationError as exc:
+            raise RequestValidationError(
+                exc.errors(include_url=False, include_context=False)
+            ) from None
+    dossier = scope.update_dossier(dossier_id, **fields)
+    scope.session.commit()
+    return dossier
 
 
 @dossier_router.post(

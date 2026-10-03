@@ -5,12 +5,15 @@ from pathlib import Path
 
 import pymupdf
 
+from app.pipeline.ocr import ocr_page, tesseract_available
+
 
 @dataclass(frozen=True)
 class PageText:
     number: int  # 1-basiert
     text: str
     has_text_layer: bool
+    ocr_used: bool = False
 
 
 @dataclass(frozen=True)
@@ -30,13 +33,22 @@ def _open(source: Path | bytes) -> pymupdf.Document:
     return pymupdf.open(source)
 
 
-def extract_pages(source: Path | bytes) -> list[PageText]:
-    """Text je Seite; eine Seite ohne nicht-leeren Text gilt als ohne Textlayer."""
+def extract_pages(source: Path | bytes, ocr: bool = True) -> list[PageText]:
+    """Text je Seite; eine Seite ohne nicht-leeren Text gilt als ohne Textlayer.
+
+    Solche Seiten laufen durch den OCR-Fallback (Tesseract, deu), sofern `ocr` gesetzt und
+    Tesseract verfügbar ist. `has_text_layer` bleibt False, `ocr_used` markiert den Fallback.
+    """
+    use_ocr = ocr and tesseract_available()
     with _open(source) as doc:
         pages: list[PageText] = []
         for index, page in enumerate(doc):
             text = str(page.get_text("text"))
-            pages.append(PageText(index + 1, text, bool(text.strip())))
+            has_layer = bool(text.strip())
+            if has_layer or not use_ocr:
+                pages.append(PageText(index + 1, text, has_layer))
+            else:
+                pages.append(PageText(index + 1, ocr_page(page), False, ocr_used=True))
         return pages
 
 
@@ -51,6 +63,6 @@ def extract_form_fields(source: Path | bytes) -> dict[str, str]:
         return fields
 
 
-def preprocess(source: Path | bytes) -> PdfContent:
-    pages = extract_pages(source)
+def preprocess(source: Path | bytes, ocr: bool = True) -> PdfContent:
+    pages = extract_pages(source, ocr=ocr)
     return PdfContent(len(pages), pages, extract_form_fields(source))

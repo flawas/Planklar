@@ -1,0 +1,2 @@
+Du siehst genau eine Plan-Seite eines Schweizer Baugesuchs. Beantworte nur diese Frage: Ist ein Nordpfeil eingezeichnet?
+Antworte "ja", "nein" oder "unklar" (wenn du es nicht sicher sagen kannst). Gib keinen Wert an (null). Beurteile nichts anderes.

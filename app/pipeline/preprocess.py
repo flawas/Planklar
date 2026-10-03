@@ -27,7 +27,7 @@ class PdfContent:
         return [p.number for p in self.pages if not p.has_text_layer]
 
 
-def _open(source: Path | bytes) -> pymupdf.Document:
+def open_pdf(source: Path | bytes) -> pymupdf.Document:
     if isinstance(source, bytes):
         return pymupdf.open(stream=source, filetype="pdf")
     return pymupdf.open(source)
@@ -40,7 +40,7 @@ def extract_pages(source: Path | bytes, ocr: bool = True) -> list[PageText]:
     Tesseract verfügbar ist. `has_text_layer` bleibt False, `ocr_used` markiert den Fallback.
     """
     use_ocr = ocr and tesseract_available()
-    with _open(source) as doc:
+    with open_pdf(source) as doc:
         pages: list[PageText] = []
         for index, page in enumerate(doc):
             text = str(page.get_text("text"))
@@ -54,7 +54,7 @@ def extract_pages(source: Path | bytes, ocr: bool = True) -> list[PageText]:
 
 def extract_form_fields(source: Path | bytes) -> dict[str, str]:
     """PDF-Formularfelder (AcroForm) als Name -> Wert; leere Werte als ''."""
-    with _open(source) as doc:
+    with open_pdf(source) as doc:
         fields: dict[str, str] = {}
         for page in doc:
             for widget in page.widgets() or []:

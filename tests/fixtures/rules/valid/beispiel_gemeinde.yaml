@@ -1,0 +1,11 @@
+# Gleiche id wie im Kanton ist erlaubt (Override), da anderer Scope.
+- id: TEST-schattendiagramm
+  titel: Schattendiagramm (Beispiel, Gemeinde)
+  scope: { kanton: SZ, gemeinde: Beispielhausen }
+  when: true
+  requires: { typ: dokument, dokument: schattendiagramm }
+  check: manuell
+  schwere: fehlt_blockierend
+  quelle: { erlass: "Beispiel-Reglement", paragraph: "Art. 2", url: "https://example.org/reglement" }
+  stand: 2026-03-01
+  disabled: true

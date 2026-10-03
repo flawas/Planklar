@@ -1,0 +1,2 @@
+Du siehst genau eine Plan-Seite eines Schweizer Baugesuchs. Beantworte nur diese Frage: Ist ein Massstab angegeben (z. B. "1:100")?
+Antworte "ja" und gib den Massstab wörtlich als Wert an (z. B. "1:100"), "nein" wenn keiner erkennbar ist, "unklar" wenn du es nicht sicher sagen kannst. Beurteile nichts anderes.

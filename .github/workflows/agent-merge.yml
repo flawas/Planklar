@@ -52,3 +52,78 @@ jobs:
           # Kein PR aus dem Event (manuell, Zeitplan, CI auf main): alle freigegebenen offenen PRs prüfen
           if [ -z "$prs" ]; then prs=$(gh pr list --state open --label review:approved --json number -q '.[].number'); fi
           for pr in $prs; do bash .github/scripts/merge-if-ready.sh "$pr"; done
+
+  # Konflikte mit main (typisch: pyproject.toml, Dockerfile, app/pipeline/preprocess.py) selbst lösen. Das LLM darf nur Konfliktmarker in den
+  # Dateien der Allowlist in resolve-conflicts.sh auflösen; alles andere geht an needs-human.
+  # Nach dem Push läuft das Review neu (review:approved gilt nur für den letzten Commit).
+  resolve-conflicts:
+    needs: merge
+    if: always() && needs.merge.result != 'cancelled' && vars.AUTO_MERGE != 'false'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - name: Secrets aus 1Password laden
+        uses: 1password/load-secrets-action@v5
+        with:
+          export-env: true
+        env:
+          OP_SERVICE_ACCOUNT_TOKEN: ${{ secrets.OP_SERVICE_ACCOUNT_TOKEN }}
+          AGENT_PAT: op://Github Actions/GitHub Agent PAT/Anmeldedaten
+          CLAUDE_CODE_OAUTH_TOKEN: op://Github Actions/Claude OAUTH Token/Anmeldedaten
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+          token: ${{ env.AGENT_PAT }}
+      - uses: actions/setup-python@v7
+        with:
+          python-version: "3.12"
+      - name: Konflikt-PR vorbereiten (main einmergen)
+        id: prep
+        env:
+          GH_TOKEN: ${{ env.AGENT_PAT }}
+          GH_REPO: ${{ github.repository }}
+        run: bash .github/scripts/resolve-conflicts.sh prepare
+      - name: Konflikt auflösen
+        if: steps.prep.outputs.pr != ''
+        uses: anthropics/claude-code-action@v1
+        with:
+          claude_code_oauth_token: ${{ env.CLAUDE_CODE_OAUTH_TOKEN }}
+          github_token: ${{ env.AGENT_PAT }}
+          prompt: |
+            Im Arbeitsverzeichnis läuft ein `git merge origin/main` mit Konflikten in: ${{ steps.prep.outputs.files }}.
+            Löse ausschliesslich die Konfliktmarker (<<<<<<<, =======, >>>>>>>) in diesen Dateien.
+            Regeln für pyproject.toml:
+            - Beide Seiten behalten: Dependencies, optionale Dependencies, Tool-Sektionen von main UND vom PR vereinen.
+            - Bei derselben Dependency mit verschiedenen Versionsgrenzen die strengere (höhere Untergrenze) nehmen.
+            - Doppelte Einträge und doppelte TOML-Tabellen vermeiden, Sortierung und Stil der Datei beibehalten.
+            Regeln für Dockerfile:
+            - Beide Seiten behalten: apt-Pakete, ENV, COPY und weitere Schritte von main UND vom PR vereinen.
+            - apt-Pakete in einer gemeinsamen, alphabetisch beibehaltenen `apt-get install`-Liste, keine doppelten Einträge.
+            - Stage-Struktur (builder/runtime), Non-root-User und HEALTHCHECK nicht verändern.
+            Regeln für app/pipeline/preprocess.py:
+            - Beide Seiten behalten: Funktionen, Klassen, Imports von main UND vom PR vereinen; nichts entfernen.
+            - Gleiche Funktion auf beiden Seiten geändert: Signatur und Verhalten beider Änderungen erhalten, die öffentliche API
+              (`open_pdf`, `extract_pages`, `extract_form_fields`, `preprocess`) bleibt aufrufbar, wie sie render.py und formfields.py nutzen.
+            - Reine Funktionen ohne Logging von Dokumentinhalt beibehalten, Imports nach ruff (isort) sortiert.
+            Nichts hinzufügen, was auf keiner Seite stand.
+            Prüfe pyproject.toml mit `python -c "import tomllib;tomllib.load(open('pyproject.toml','rb'))"`
+            und preprocess.py mit `python -m py_compile app/pipeline/preprocess.py`.
+            Nicht committen, nicht pushen, kein `git add`: das macht das Skript danach.
+          claude_args: |
+            --model claude-sonnet-5-5
+            --max-turns 15
+            --allowedTools "Read,Edit,Grep,Bash(python:*),Bash(python -m py_compile:*),Bash(git diff:*),Bash(git show:*)"
+      - name: Ergebnis prüfen, committen, pushen
+        if: steps.prep.outputs.pr != ''
+        env:
+          GH_TOKEN: ${{ env.AGENT_PAT }}
+          GH_REPO: ${{ github.repository }}
+        run: bash .github/scripts/resolve-conflicts.sh finish "${{ steps.prep.outputs.pr }}" "${{ steps.prep.outputs.branch }}"
+      - name: Bei Fehlschlag markieren
+        if: failure() && steps.prep.outputs.pr != ''
+        env:
+          GH_TOKEN: ${{ env.AGENT_PAT }}
+          GH_REPO: ${{ github.repository }}
+        run: |
+          gh pr edit "${{ steps.prep.outputs.pr }}" --add-label needs-human || true
+          gh pr comment "${{ steps.prep.outputs.pr }}" --body "Automatische Konfliktauflösung fehlgeschlagen: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}" || true

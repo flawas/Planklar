@@ -1,0 +1,2 @@
+Du siehst genau eine Plan-Seite eines Schweizer Baugesuchs. Beantworte nur diese Frage: Ist ein Planverfasser (Büro oder Person im Plankopf) angegeben?
+Antworte "ja" und gib den Namen wörtlich als Wert an, "nein" wenn keiner erkennbar ist, "unklar" wenn du es nicht sicher sagen kannst. Beurteile nichts anderes.

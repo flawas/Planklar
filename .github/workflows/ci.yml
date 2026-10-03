@@ -76,7 +76,8 @@ jobs:
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v7
-      - run: docker compose config -q
+      - if: needs.detect.outputs.compose == 'true'
+        run: docker compose config -q
       - run: docker build -t planklar:ci .
 
   smoke:

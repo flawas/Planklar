@@ -9,9 +9,24 @@ permissions:
   contents: read
 
 jobs:
+  detect:
+    # hashFiles() ist auf Job-Ebene nicht erlaubt, daher Dateiprüfung per Shell.
+    runs-on: ubuntu-latest
+    outputs:
+      python: ${{ steps.f.outputs.python }}
+      rules: ${{ steps.f.outputs.rules }}
+      docker: ${{ steps.f.outputs.docker }}
+    steps:
+      - uses: actions/checkout@v4
+      - id: f
+        run: |
+          echo "python=$([ -f pyproject.toml ] && echo true || echo false)" >> "$GITHUB_OUTPUT"
+          echo "rules=$([ -f rules/schema.json ] && echo true || echo false)" >> "$GITHUB_OUTPUT"
+          echo "docker=$([ -f Dockerfile ] && echo true || echo false)" >> "$GITHUB_OUTPUT"
+
   python:
-    # Läuft erst, sobald das Gerüst (pyproject.toml) existiert.
-    if: hashFiles('pyproject.toml') != ''
+    needs: detect
+    if: needs.detect.outputs.python == 'true'
     runs-on: ubuntu-latest
     services:
       postgres:
@@ -40,7 +55,8 @@ jobs:
       - run: pytest -q
 
   rules:
-    if: hashFiles('rules/schema.json') != ''
+    needs: detect
+    if: needs.detect.outputs.rules == 'true'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -53,7 +69,8 @@ jobs:
         run: python -m app.rules.validate
 
   docker:
-    if: hashFiles('Dockerfile') != ''
+    needs: detect
+    if: needs.detect.outputs.docker == 'true'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4

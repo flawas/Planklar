@@ -55,3 +55,7 @@ Flow (GitHub Actions in `.github/workflows/`):
 6. `ci.yml` – lint, tests, rule validation, docker build (each job activates once its files exist).
 
 Required secrets: `OP_SERVICE_ACCOUNT_TOKEN` (GitHub secret). The workflows load `AGENT_PAT` (GitHub PAT or App token; item "GitHub Agent PAT") and `CLAUDE_CODE_OAUTH_TOKEN` (item "Claude OAUTH Token") from the 1Password vault "Github Actions". Use a PAT/App token rather than `GITHUB_TOKEN` because events created with the default `GITHUB_TOKEN` do not trigger other workflows, so the chain would stop. Run `.github/scripts/setup-labels.sh` once. Use branch protection on `main` requiring CI.
+
+## Datenzugriff (Mandantentrennung)
+
+Dossier, Dokument und Seite werden ausschliesslich über `app.dossiers.scope.BueroScope` gelesen und geschrieben (in Endpunkten via `Depends(get_scope)`). Direkte `select(Dossier)`/`session.get(Dokument, …)` ausserhalb dieser Schicht sind nicht erlaubt. Fremde Objekte lösen `NotFoundError` aus, Endpunkte antworten mit `not_found()` (404). Neue Entitäten (z. B. Prüflauf, Befund) werden in `BueroScope` ergänzt, jeweils mit einem Eintrag im Fremdzugriff-Test `tests/dossiers/test_scope.py`.

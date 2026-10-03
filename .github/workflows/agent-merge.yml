@@ -8,6 +8,9 @@ on:
   workflow_run:
     workflows: [CI]
     types: [completed]
+  workflow_dispatch:
+  schedule:
+    - cron: "*/20 * * * *"   # Sicherheitsnetz: räumt freigegebene PRs auf, deren Trigger verpasst wurde
 
 permissions:
   contents: read
@@ -22,7 +25,9 @@ jobs:
     if: >
       vars.AUTO_MERGE != 'false' && (
         (github.event_name == 'pull_request' && github.event.label.name == 'review:approved') ||
-        (github.event_name == 'workflow_run' && github.event.workflow_run.conclusion != 'cancelled')
+        (github.event_name == 'workflow_run' && github.event.workflow_run.conclusion != 'cancelled') ||
+        github.event_name == 'workflow_dispatch' ||
+        github.event_name == 'schedule'
       )
     runs-on: ubuntu-24.04
     timeout-minutes: 10
@@ -44,4 +49,6 @@ jobs:
         run: |
           prs="$PR_FROM_LABEL"
           if [ -z "$prs" ]; then prs=$(jq -r '.[]' <<<"$PRS_FROM_CI"); fi
+          # Kein PR aus dem Event (manuell, Zeitplan, CI auf main): alle freigegebenen offenen PRs prüfen
+          if [ -z "$prs" ]; then prs=$(gh pr list --state open --label review:approved --json number -q '.[].number'); fi
           for pr in $prs; do bash .github/scripts/merge-if-ready.sh "$pr"; done

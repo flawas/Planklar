@@ -95,6 +95,26 @@ def test_doppelte_email_409(client: TestClient, db: Session) -> None:
     assert r.status_code == 409
 
 
+def test_login_name_mit_wildcard_trifft_keinen_benutzer(client: TestClient, db: Session) -> None:
+    make_user(db, "a@buero-a.ch")
+    make_user(db, "b@buero-a.ch")
+    assert login(client, "%").status_code == 400
+    assert login(client, "%@buero-a.ch").status_code == 400
+
+
+def test_email_mit_unterstrich_ist_kein_duplikat(client: TestClient, db: Session) -> None:
+    make_user(db, "admin@buero-a.ch", superuser=True)
+    make_user(db, "aXb@x.ch")
+    login(client, "admin@buero-a.ch")
+    r = client.post("/admin/users", json={"email": "a_b@x.ch", "password": PASSWORD})
+    assert r.status_code == 201
+
+
+def test_login_ignoriert_gross_kleinschreibung(client: TestClient, db: Session) -> None:
+    make_user(db, "a@buero-a.ch")
+    assert login(client, "A@Buero-A.ch").status_code == 204
+
+
 def test_oidc_standardmaessig_deaktiviert() -> None:
     s = Settings()
     assert s.oidc_enabled is False

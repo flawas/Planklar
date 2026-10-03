@@ -11,7 +11,7 @@ from fastapi_users.authentication import (
 )
 from fastapi_users.db import BaseUserDatabase
 from fastapi_users.password import PasswordHelper
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from app.config import get_settings
@@ -44,7 +44,7 @@ class SyncSQLAlchemyUserDatabase(BaseUserDatabase[User, uuid.UUID]):
         return self.session.get(User, id)
 
     async def get_by_email(self, email: str) -> User | None:
-        stmt = select(User).where(User.email.ilike(email))
+        stmt = select(User).where(func.lower(User.email) == email.lower())
         return self.session.execute(stmt).scalar_one_or_none()
 
     async def create(self, create_dict: dict[str, Any]) -> User:

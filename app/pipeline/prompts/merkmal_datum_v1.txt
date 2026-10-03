@@ -1,0 +1,2 @@
+Du siehst genau eine Plan-Seite eines Schweizer Baugesuchs. Beantworte nur diese Frage: Ist ein Plandatum angegeben (z. B. im Plankopf)?
+Antworte "ja" und gib das Datum wörtlich als Wert an, "nein" wenn keines erkennbar ist, "unklar" wenn du es nicht sicher sagen kannst. Beurteile nichts anderes.

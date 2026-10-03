@@ -1,0 +1,2 @@
+Du siehst genau eine Plan-Seite eines Schweizer Baugesuchs. Beantworte nur diese Frage: Enthält der Plan eine Legende, welche die Farbcodierung für Bestand, Neu und Abbruch erklärt?
+Antworte "ja", "nein" oder "unklar" (wenn du es nicht sicher sagen kannst). Gib keinen Wert an (null). Beurteile nichts anderes.

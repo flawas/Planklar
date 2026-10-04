@@ -5,6 +5,7 @@ import uuid
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
+from app import audit
 from app.auth.tokens import (
     EINLADUNG_GUELTIG,
     RESET_GUELTIG,
@@ -107,6 +108,15 @@ def loese_einladung_ein(db: Session, token: str, password: str) -> User:
     )
     einladung.used_at = jetzt()
     db.add(user)
+    db.flush()
+    audit.protokolliere(
+        db,
+        audit.USER_ANGELEGT,
+        buero_id=user.buero_id,
+        user_id=user.id,
+        objekt_typ="user",
+        objekt_id=user.id,
+    )
     db.commit()
     return user
 
@@ -143,5 +153,15 @@ def loese_reset_ein(db: Session, token: str, password: str) -> None:
     if user is None or not user.is_active:
         raise TokenError("TOKEN_INVALID")
     user.hashed_password = hash_password(password)
+    # Alle bisherigen Sitzungen enden (z. B. Reset nach Kontoübernahme)
+    user.session_version += 1
     reset.used_at = jetzt()
+    audit.protokolliere(
+        db,
+        audit.PASSWORT_GEAENDERT,
+        buero_id=user.buero_id,
+        user_id=user.id,
+        objekt_typ="user",
+        objekt_id=user.id,
+    )
     db.commit()

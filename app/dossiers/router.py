@@ -1,5 +1,4 @@
 import uuid
-from pathlib import PurePosixPath, PureWindowsPath
 
 from fastapi import APIRouter, Depends, HTTPException, UploadFile, status
 from fastapi.exceptions import RequestValidationError
@@ -21,6 +20,7 @@ from app.dossiers.scope import BueroScope, NotFoundError, get_scope, not_found
 from app.dossiers.service import (
     DossierNotFoundError,
     UploadError,
+    basename,
     get_dossier,
     get_storage,
     upload_dokument,
@@ -82,10 +82,6 @@ def update_dossier(
     return dossier
 
 
-def _basename(name: str) -> str:
-    return PurePosixPath(PureWindowsPath(name).name).name or "dokument.pdf"
-
-
 @dossier_router.post(
     "/{dossier_id}/dokumente", response_model=DokumentRead, status_code=status.HTTP_201_CREATED
 )
@@ -104,7 +100,7 @@ async def upload(
     data = await file.read(limit + 1)  # nie mehr als Limit + 1 Byte in den Speicher
     try:
         return upload_dokument(
-            session, storage, dossier, _basename(file.filename or ""), data, limit
+            session, storage, dossier, basename(file.filename or ""), data, limit
         )
     except UploadError as exc:
         raise HTTPException(_STATUS[exc.code], exc.code) from None

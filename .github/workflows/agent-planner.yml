@@ -19,23 +19,15 @@ jobs:
     runs-on: ubuntu-24.04
     timeout-minutes: 30
     steps:
-      - name: Secrets aus 1Password laden
-        uses: 1password/load-secrets-action@v5
-        with:
-          export-env: true
-        env:
-          OP_SERVICE_ACCOUNT_TOKEN: ${{ secrets.OP_SERVICE_ACCOUNT_TOKEN }}
-          AGENT_PAT: op://Github Actions/GitHub Agent PAT/Anmeldedaten
-          CLAUDE_CODE_OAUTH_TOKEN: op://Github Actions/Claude OAUTH Token/Anmeldedaten
       - uses: actions/checkout@v7
       - name: Labels anlegen
         env:
-          GH_TOKEN: ${{ env.AGENT_PAT }}
+          GH_TOKEN: ${{ secrets.AGENT_PAT }}
         run: bash .github/scripts/setup-labels.sh
       - uses: anthropics/claude-code-action@v1
         with:
-          claude_code_oauth_token: ${{ env.CLAUDE_CODE_OAUTH_TOKEN }}
-          github_token: ${{ env.AGENT_PAT }}
+          claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
+          github_token: ${{ secrets.AGENT_PAT }}
           prompt: |
             Du arbeitest als Rolle "product-owner". Lies CLAUDE.md und .claude/agents/product-owner.md und folge der Rolle.
             Fokus: ${{ inputs.focus || 'gesamter MVP, Phase 0 bis 5' }}.

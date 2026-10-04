@@ -25,26 +25,18 @@ jobs:
     runs-on: ubuntu-24.04
     timeout-minutes: 20
     steps:
-      - name: Secrets aus 1Password laden
-        uses: 1password/load-secrets-action@v5
-        with:
-          export-env: true
-        env:
-          OP_SERVICE_ACCOUNT_TOKEN: ${{ secrets.OP_SERVICE_ACCOUNT_TOKEN }}
-          AGENT_PAT: op://Github Actions/GitHub Agent PAT/Anmeldedaten
-          CLAUDE_CODE_OAUTH_TOKEN: op://Github Actions/Claude OAUTH Token/Anmeldedaten
       - uses: actions/checkout@v7
         with:
           fetch-depth: 0
-          token: ${{ env.AGENT_PAT }}
+          token: ${{ secrets.AGENT_PAT }}
       - name: Alte Review-Labels entfernen
         env:
-          GH_TOKEN: ${{ env.AGENT_PAT }}
+          GH_TOKEN: ${{ secrets.AGENT_PAT }}
         run: gh pr edit ${{ github.event.pull_request.number }} --remove-label review:approved --remove-label review:changes-requested || true
       - uses: anthropics/claude-code-action@v1
         with:
-          claude_code_oauth_token: ${{ env.CLAUDE_CODE_OAUTH_TOKEN }}
-          github_token: ${{ env.AGENT_PAT }}
+          claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
+          github_token: ${{ secrets.AGENT_PAT }}
           prompt: |
             Du arbeitest als Rolle "reviewer". Lies CLAUDE.md und .claude/agents/reviewer.md.
             Prüfe PR #${{ github.event.pull_request.number }} (`gh pr view` und `gh pr diff`), das verlinkte Issue
@@ -62,24 +54,16 @@ jobs:
     runs-on: ubuntu-24.04
     timeout-minutes: 45
     steps:
-      - name: Secrets aus 1Password laden
-        uses: 1password/load-secrets-action@v5
-        with:
-          export-env: true
-        env:
-          OP_SERVICE_ACCOUNT_TOKEN: ${{ secrets.OP_SERVICE_ACCOUNT_TOKEN }}
-          AGENT_PAT: op://Github Actions/GitHub Agent PAT/Anmeldedaten
-          CLAUDE_CODE_OAUTH_TOKEN: op://Github Actions/Claude OAUTH Token/Anmeldedaten
       - uses: actions/checkout@v7
         with:
           ref: ${{ github.event.pull_request.head.ref }}
           fetch-depth: 0
-          token: ${{ env.AGENT_PAT }}
+          token: ${{ secrets.AGENT_PAT }}
 
       - name: Rolle und Runde bestimmen
         id: ctx
         env:
-          GH_TOKEN: ${{ env.AGENT_PAT }}
+          GH_TOKEN: ${{ secrets.AGENT_PAT }}
         run: |
           ref='${{ github.event.pull_request.head.ref }}'
           role=$(cut -d/ -f2 <<<"$ref")
@@ -96,8 +80,8 @@ jobs:
         if: steps.ctx.outputs.stop != 'true'
         uses: anthropics/claude-code-action@v1
         with:
-          claude_code_oauth_token: ${{ env.CLAUDE_CODE_OAUTH_TOKEN }}
-          github_token: ${{ env.AGENT_PAT }}
+          claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
+          github_token: ${{ secrets.AGENT_PAT }}
           prompt: |
             Du arbeitest als Rolle "${{ steps.ctx.outputs.role }}". Lies CLAUDE.md und .claude/agents/${{ steps.ctx.outputs.role }}.md.
             Du bist auf dem Branch von PR #${{ github.event.pull_request.number }}. Lies den letzten Review-Kommentar
@@ -113,6 +97,6 @@ jobs:
       - name: CI und Review anstossen
         if: steps.ctx.outputs.stop != 'true'
         env:
-          GH_TOKEN: ${{ env.AGENT_PAT }}
+          GH_TOKEN: ${{ secrets.AGENT_PAT }}
           GH_REPO: ${{ github.repository }}
         run: bash .github/scripts/ensure-ci.sh '${{ github.event.pull_request.head.ref }}'

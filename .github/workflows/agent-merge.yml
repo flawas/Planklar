@@ -32,17 +32,10 @@ jobs:
     runs-on: ubuntu-24.04
     timeout-minutes: 10
     steps:
-      - name: Secrets aus 1Password laden
-        uses: 1password/load-secrets-action@v5
-        with:
-          export-env: true
-        env:
-          OP_SERVICE_ACCOUNT_TOKEN: ${{ secrets.OP_SERVICE_ACCOUNT_TOKEN }}
-          AGENT_PAT: op://Github Actions/GitHub Agent PAT/Anmeldedaten
       - uses: actions/checkout@v7
       - name: Passende PRs ermitteln und mergen
         env:
-          GH_TOKEN: ${{ env.AGENT_PAT }}
+          GH_TOKEN: ${{ secrets.AGENT_PAT }}
           GH_REPO: ${{ github.repository }}
           PR_FROM_LABEL: ${{ github.event.pull_request.number }}
           PRS_FROM_CI: ${{ toJSON(github.event.workflow_run.pull_requests.*.number) }}
@@ -62,33 +55,25 @@ jobs:
     runs-on: ubuntu-24.04
     timeout-minutes: 15
     steps:
-      - name: Secrets aus 1Password laden
-        uses: 1password/load-secrets-action@v5
-        with:
-          export-env: true
-        env:
-          OP_SERVICE_ACCOUNT_TOKEN: ${{ secrets.OP_SERVICE_ACCOUNT_TOKEN }}
-          AGENT_PAT: op://Github Actions/GitHub Agent PAT/Anmeldedaten
-          CLAUDE_CODE_OAUTH_TOKEN: op://Github Actions/Claude OAUTH Token/Anmeldedaten
       - uses: actions/checkout@v7
         with:
           fetch-depth: 0
-          token: ${{ env.AGENT_PAT }}
+          token: ${{ secrets.AGENT_PAT }}
       - uses: actions/setup-python@v7
         with:
           python-version: "3.12"
       - name: Konflikt-PR vorbereiten (main einmergen)
         id: prep
         env:
-          GH_TOKEN: ${{ env.AGENT_PAT }}
+          GH_TOKEN: ${{ secrets.AGENT_PAT }}
           GH_REPO: ${{ github.repository }}
         run: bash .github/scripts/resolve-conflicts.sh prepare
       - name: Konflikt auflösen
         if: steps.prep.outputs.pr != ''
         uses: anthropics/claude-code-action@v1
         with:
-          claude_code_oauth_token: ${{ env.CLAUDE_CODE_OAUTH_TOKEN }}
-          github_token: ${{ env.AGENT_PAT }}
+          claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
+          github_token: ${{ secrets.AGENT_PAT }}
           prompt: |
             Im Arbeitsverzeichnis läuft ein `git merge origin/main` mit Konflikten in: ${{ steps.prep.outputs.files }}.
             Löse ausschliesslich die Konfliktmarker (<<<<<<<, =======, >>>>>>>) in diesen Dateien.
@@ -116,13 +101,13 @@ jobs:
       - name: Ergebnis prüfen, committen, pushen
         if: steps.prep.outputs.pr != ''
         env:
-          GH_TOKEN: ${{ env.AGENT_PAT }}
+          GH_TOKEN: ${{ secrets.AGENT_PAT }}
           GH_REPO: ${{ github.repository }}
         run: bash .github/scripts/resolve-conflicts.sh finish "${{ steps.prep.outputs.pr }}" "${{ steps.prep.outputs.branch }}"
       - name: Bei Fehlschlag markieren
         if: failure() && steps.prep.outputs.pr != ''
         env:
-          GH_TOKEN: ${{ env.AGENT_PAT }}
+          GH_TOKEN: ${{ secrets.AGENT_PAT }}
           GH_REPO: ${{ github.repository }}
         run: |
           gh pr edit "${{ steps.prep.outputs.pr }}" --add-label needs-human || true

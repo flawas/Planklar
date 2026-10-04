@@ -22,23 +22,15 @@ jobs:
     runs-on: ubuntu-24.04
     timeout-minutes: 45
     steps:
-      - name: Secrets aus 1Password laden
-        uses: 1password/load-secrets-action@v5
-        with:
-          export-env: true
-        env:
-          OP_SERVICE_ACCOUNT_TOKEN: ${{ secrets.OP_SERVICE_ACCOUNT_TOKEN }}
-          AGENT_PAT: op://Github Actions/GitHub Agent PAT/Anmeldedaten
-          CLAUDE_CODE_OAUTH_TOKEN: op://Github Actions/Claude OAUTH Token/Anmeldedaten
       - uses: actions/checkout@v7
         with:
           fetch-depth: 0
-          token: ${{ env.AGENT_PAT }}
+          token: ${{ secrets.AGENT_PAT }}
 
       - name: Rolle bestimmen
         id: role
         env:
-          GH_TOKEN: ${{ env.AGENT_PAT }}
+          GH_TOKEN: ${{ secrets.AGENT_PAT }}
         run: |
           role=$(gh issue view ${{ github.event.issue.number }} --json labels -q '.labels[].name' \
                  | grep '^agent:' | head -1 | cut -d: -f2 || true)
@@ -50,7 +42,7 @@ jobs:
 
       - name: Status setzen
         env:
-          GH_TOKEN: ${{ env.AGENT_PAT }}
+          GH_TOKEN: ${{ secrets.AGENT_PAT }}
         run: gh issue edit ${{ github.event.issue.number }} --remove-label status:ready --add-label status:in-progress
 
       - name: Python-Umgebung (falls vorhanden)
@@ -62,8 +54,8 @@ jobs:
       - name: Agent ausführen
         uses: anthropics/claude-code-action@v1
         with:
-          claude_code_oauth_token: ${{ env.CLAUDE_CODE_OAUTH_TOKEN }}
-          github_token: ${{ env.AGENT_PAT }}
+          claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
+          github_token: ${{ secrets.AGENT_PAT }}
           prompt: |
             Du arbeitest als Rolle "${{ steps.role.outputs.role }}".
             Lies zuerst CLAUDE.md und .claude/agents/${{ steps.role.outputs.role }}.md und halte dich daran.
@@ -85,7 +77,7 @@ jobs:
 
       - name: CI und Review anstossen
         env:
-          GH_TOKEN: ${{ env.AGENT_PAT }}
+          GH_TOKEN: ${{ secrets.AGENT_PAT }}
           GH_REPO: ${{ github.repository }}
         run: |
           branch=$(git branch --show-current)
@@ -94,7 +86,7 @@ jobs:
       - name: Bei Fehlschlag markieren
         if: failure()
         env:
-          GH_TOKEN: ${{ env.AGENT_PAT }}
+          GH_TOKEN: ${{ secrets.AGENT_PAT }}
         run: |
           gh issue edit ${{ github.event.issue.number }} --remove-label status:in-progress --add-label needs-human || true
           gh issue comment ${{ github.event.issue.number }} --body "Agent-Lauf fehlgeschlagen: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}" || true

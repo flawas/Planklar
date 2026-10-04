@@ -87,8 +87,6 @@ jobs:
     timeout-minutes: 15
     steps:
       - uses: actions/checkout@v7
-      - name: .env aus Vorlage (nur Platzhalter)
-        run: '[ -f .env ] || cp .env.example .env'
       - name: Stack hochfahren
         run: docker compose up -d --build --wait --wait-timeout 300
       - name: Health prüfen

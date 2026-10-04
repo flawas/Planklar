@@ -2,7 +2,10 @@
 # Web: http://localhost:8000 (GET /health), S3-API: http://localhost:8333
 
 x-app: &app
-  build: .
+  build:
+    context: .
+    args:
+      GIT_COMMIT: ${GIT_COMMIT:-unbekannt}
   image: planklar:dev
   environment:
     DATABASE_URL: postgresql+psycopg://planklar:planklar@db:5432/planklar
@@ -23,7 +26,8 @@ x-app: &app
 services:
   web:
     <<: *app
-    command: ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000"]
+    # Migration vor dem Start: das Lifespan schreibt den Regelkatalog in die DB.
+    command: ["sh", "-c", "alembic upgrade head && exec uvicorn app.main:app --host 0.0.0.0 --port 8000"]
     ports:
       - "8000:8000"
 

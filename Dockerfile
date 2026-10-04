@@ -1,5 +1,5 @@
 # syntax=docker/dockerfile:1
-# Ein Image für web und worker; der Startbefehl wird von Compose gesetzt.
+# Ein Image für web und worker; Compose setzt den Startbefehl (web migriert vor uvicorn, worker nicht).
 
 FROM python:3.12-slim AS builder
 
@@ -39,6 +39,10 @@ COPY --chown=planklar:planklar app ./app
 COPY --chown=planklar:planklar alembic.ini ./alembic.ini
 # Regelkatalog im Image, damit Image-Tag und Regelstand zusammenpassen; per Volume überschreibbar.
 COPY --chown=planklar:planklar rules ./rules
+
+# Git-Commit des Builds (--build-arg GIT_COMMIT=...), wird mit dem Regelset gespeichert.
+ARG GIT_COMMIT=unbekannt
+ENV GIT_COMMIT=$GIT_COMMIT
 
 USER planklar
 EXPOSE 8000

@@ -23,6 +23,7 @@ dependencies = [
     "fastapi-users>=15",
     "python-multipart>=0.0.9",
     "jinja2>=3.1",
+    "json-logic-qubit>=0.9",
 ]
 
 [project.optional-dependencies]
@@ -60,6 +61,10 @@ extend-immutable-calls = ["fastapi.Depends"]
 python_version = "3.12"
 files = ["app/rules", "app/pipeline"]
 strict = true
+
+[[tool.mypy.overrides]]
+module = ["json_logic"]
+ignore_missing_imports = true
 
 [[tool.mypy.overrides]]
 module = ["app.pipeline.preprocess", "app.pipeline.ocr"]

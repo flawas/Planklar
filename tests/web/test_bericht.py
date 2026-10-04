@@ -1,6 +1,7 @@
 import re
 import uuid
 from collections.abc import Iterator
+from pathlib import Path
 
 import pymupdf
 import pytest
@@ -247,3 +248,21 @@ def test_dossier_seite_verlinkt_bericht_und_startet(client: TestClient, bericht)
     assert f"/dossiers/{dossier.id}/pruefen" in html
     assert url(dossier, pruefung) in html
     assert uuid.UUID(str(pruefung.id))
+
+
+def test_bericht_ohne_katalog_zeigt_eigenen_hinweis(  # type: ignore[no-untyped-def]
+    client: TestClient, bericht, monkeypatch: pytest.MonkeyPatch, caplog: pytest.LogCaptureFixture
+) -> None:
+    from app.reports import bericht as modul
+    from app.rules.loader import RegelLadeFehler
+
+    def kaputt(*args, **kwargs):  # type: ignore[no-untyped-def]
+        raise RegelLadeFehler(Path("x.yaml"), "defekt")
+
+    monkeypatch.setattr(modul, "resolve", kaputt)
+    _, dossier, pruefung, _, _ = bericht
+    r = client.get(url(dossier, pruefung))
+    assert r.status_code == 200
+    assert "Regelkatalog nicht verfügbar" in r.text
+    assert "nicht mehr im aktuellen Regelkatalog" not in r.text
+    assert "defekt" not in caplog.text

@@ -18,6 +18,9 @@
   {% elif p.status.value == "fehlgeschlagen" %}
   <p class="fehler" role="alert">Die Prüfung ist fehlgeschlagen. Bitte starten Sie sie erneut.</p>
   {% else %}
+  {% if not bericht.katalog_verfuegbar %}
+  <p class="fehler" role="alert">Der Regelkatalog ist nicht verfügbar. Quellenangaben können nicht angezeigt werden.</p>
+  {% endif %}
   {% if bericht.regelset_abweichend %}
   <p class="hinweis">Hinweis: Der Regelkatalog wurde seit dieser Prüfung geändert. Quellen zeigen den aktuellen Stand.</p>
   {% endif %}

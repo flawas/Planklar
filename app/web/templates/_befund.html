@@ -8,6 +8,7 @@
     {% if z.erlass %}Quelle:
     {% if z.url and modus != "pdf" %}<a href="{{ z.url }}" rel="noopener noreferrer" target="_blank">{{ z.erlass }} {{ z.paragraph }}</a>{% else %}{{ z.erlass }} {{ z.paragraph }}{% if z.url %} ({{ z.url }}){% endif %}{% endif %}
     · Stand {{ z.stand }}
+    {% elif not z.katalog_verfuegbar %}Quelle: Regelkatalog nicht verfügbar (Regel {{ z.regel_id }})
     {% else %}Quelle: Regel {{ z.regel_id }} (nicht mehr im aktuellen Regelkatalog){% endif %}
   </p>
   {% if z.belege %}

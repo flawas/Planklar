@@ -4,12 +4,14 @@ Der Bericht zeigt nur, was die Regel-Engine entschieden hat (oder ein Mensch per
 er macht keine Bewilligungsaussage.
 """
 
+import logging
 import uuid
 from dataclasses import dataclass, field
 
 from app.db import models as db
 from app.dossiers import vorschau
 from app.dossiers.scope import BueroScope, NotFoundError
+from app.rules.loader import RegelLadeFehler
 from app.rules.models import Kanton, Regel
 from app.rules.resolve import resolve
 
@@ -23,6 +25,8 @@ ANZEIGE: dict[db.Ergebnis, tuple[str, str]] = {
     db.Ergebnis.MANUELL: ("Manuell prüfen", "✎"),
 }
 REIHENFOLGE = (db.Ergebnis.FEHLT, db.Ergebnis.UNSICHER, db.Ergebnis.MANUELL, db.Ergebnis.ERFUELLT)
+
+log = logging.getLogger(__name__)
 
 MANUELL_BEGRUENDUNG = "Manuell geprüft und bestätigt."
 
@@ -49,10 +53,7 @@ class Zeile:
     ergebnis: db.Ergebnis  # wirksam: Override, sonst Original
     begruendung: str | None
     belege: list[Beleg] = field(default_factory=list)
-
-    @property
-    def uebersteuert(self) -> bool:
-        return self.ergebnis != self.original or self.begruendung is not None
+    katalog_verfuegbar: bool = True
 
     @property
     def text(self) -> str:
@@ -74,12 +75,15 @@ class Bericht:
     zeilen: list[Zeile]
     zaehler: list[tuple[db.Ergebnis, str, str, int]]  # (Ergebnis, Text, Symbol, Anzahl)
     regelset_abweichend: bool
+    katalog_verfuegbar: bool = True
 
 
 def _regeln(dossier: db.Dossier) -> tuple[dict[str, Regel], str | None]:
     try:
         regelset = resolve(Kanton(dossier.kanton.value), dossier.gemeinde)
-    except Exception:  # fehlender Katalog: Bericht bleibt mit Regel-IDs lesbar
+    except (RegelLadeFehler, OSError) as exc:
+        # Katalog fehlt oder ist ungültig: nur Fehlertyp loggen, keine Inhalte
+        log.error("Regelkatalog nicht ladbar (%s)", type(exc).__name__)
         return {}, None
     return {r.id: r for r in regelset.regeln}, regelset.hash
 
@@ -104,6 +108,7 @@ def baue_bericht(scope: BueroScope, pruefung_id: uuid.UUID) -> Bericht:
     pruefung = scope.get_pruefung(pruefung_id)
     dossier = pruefung.dossier
     regeln, aktueller_hash = _regeln(dossier)
+    katalog_verfuegbar = aktueller_hash is not None
     zeilen: list[Zeile] = []
     for b in scope.list_befunde(pruefung_id):
         regel = regeln.get(b.regel_id)
@@ -121,6 +126,7 @@ def baue_bericht(scope: BueroScope, pruefung_id: uuid.UUID) -> Bericht:
                 ergebnis=b.override_ergebnis or b.ergebnis,
                 begruendung=b.override_begruendung,
                 belege=_belege(scope, b.belege),
+                katalog_verfuegbar=katalog_verfuegbar,
             )
         )
     zeilen.sort(key=lambda z: (REIHENFOLGE.index(z.ergebnis), z.regel_id))
@@ -133,5 +139,6 @@ def baue_bericht(scope: BueroScope, pruefung_id: uuid.UUID) -> Bericht:
         dossier=dossier,
         zeilen=zeilen,
         zaehler=zaehler,
-        regelset_abweichend=aktueller_hash is not None and aktueller_hash != pruefung.regelset_hash,
+        regelset_abweichend=katalog_verfuegbar and aktueller_hash != pruefung.regelset_hash,
+        katalog_verfuegbar=katalog_verfuegbar,
     )

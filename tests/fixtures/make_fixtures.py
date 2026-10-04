@@ -18,6 +18,17 @@ def make_mixed(path: Path) -> None:
     doc.save(path)
 
 
+def make_scanned(path: Path) -> None:
+    """Eine Seite, deren Text nur als Bild vorliegt (kein Textlayer)."""
+    src = pymupdf.open()
+    src.new_page().insert_text((72, 100), "Baugesuch Situationsplan", fontsize=28)
+    pix = src[0].get_pixmap(dpi=200)
+    doc = pymupdf.open()
+    page = doc.new_page()
+    page.insert_image(page.rect, pixmap=pix)
+    doc.save(path)
+
+
 def make_form(path: Path) -> None:
     doc = pymupdf.open()
     page = doc.new_page()
@@ -33,4 +44,5 @@ def make_form(path: Path) -> None:
 
 if __name__ == "__main__":
     make_mixed(HERE / "mixed.pdf")
+    make_scanned(HERE / "scanned.pdf")
     make_form(HERE / "form.pdf")

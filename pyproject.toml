@@ -62,5 +62,5 @@ files = ["app/rules", "app/pipeline"]
 strict = true
 
 [[tool.mypy.overrides]]
-module = "app.pipeline.preprocess"
+module = ["app.pipeline.preprocess", "app.pipeline.ocr"]
 disallow_untyped_calls = false

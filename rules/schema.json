@@ -1,6 +1,6 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "title": "Planklar Regeldatei",
+  "title": "Liquet Regeldatei",
   "description": "Eine Regeldatei ist eine Liste von Regeln.",
   "type": "array",
   "items": { "$ref": "#/$defs/regel" },

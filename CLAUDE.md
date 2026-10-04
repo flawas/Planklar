@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project
 
-Planklar is a pre-submission check for Swiss building permit applications (Baugesuche). It validates forms, plans, and attachments for completeness against cantonal and communal requirements before submission. Initial scope covers the cantons of Luzern and Schwyz.
+Liquet is a pre-submission check for Swiss building permit applications (Baugesuche). It validates forms, plans, and attachments for completeness against cantonal and communal requirements before submission. Initial scope covers the cantons of Luzern and Schwyz.
 
 The authoritative design is `Implementationsplan Baugesuch-Check.md` (scope, stack, data model, pipeline, tests, privacy). Follow it; deviations need an ADR in `docs/adr/`.
 

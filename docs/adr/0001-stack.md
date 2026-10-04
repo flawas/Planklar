@@ -1,7 +1,7 @@
 # 0001 – Stack
 
 ## Kontext
-Planklar prüft Baugesuche auf formale Vollständigkeit. Ein Einzelentwickler pflegt eine Codebasis; PDF-, OCR- und KI-Anbindung sind in Python am ausgereiftesten. Details: Implementationsplan, Abschnitt "Tech-Stack".
+Liquet prüft Baugesuche auf formale Vollständigkeit. Ein Einzelentwickler pflegt eine Codebasis; PDF-, OCR- und KI-Anbindung sind in Python am ausgereiftesten. Details: Implementationsplan, Abschnitt "Tech-Stack".
 
 ## Entscheidung
 - Python 3.12, FastAPI, Jinja2 + HTMX (ein Service für API und UI, kein JS-Build)

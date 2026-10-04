@@ -18,7 +18,7 @@ from app.config import get_settings
 from app.db.models import User
 from app.db.session import get_session
 
-COOKIE_NAME = "planklar_session"
+COOKIE_NAME = "liquet_session"
 
 _password_helper = PasswordHelper()
 

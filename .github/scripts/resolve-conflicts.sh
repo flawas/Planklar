@@ -19,8 +19,8 @@ human() { # <pr> <grund>
 }
 is_allowed() { local f; for f in "${ALLOWED[@]}"; do [ "$f" = "$1" ] && return 0; done; return 1; }
 
-git config user.name "planklar-agent"
-git config user.email "planklar-agent@users.noreply.github.com"
+git config user.name "liquet-agent"
+git config user.email "liquet-agent@users.noreply.github.com"
 
 mode="${1:?prepare|finish}"
 

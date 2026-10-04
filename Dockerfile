@@ -29,17 +29,17 @@ RUN apt-get update \
         fonts-dejavu-core \
     && rm -rf /var/lib/apt/lists/*
 
-RUN groupadd --system --gid 10001 planklar \
-    && useradd --system --uid 10001 --gid planklar --home-dir /srv --shell /usr/sbin/nologin planklar
+RUN groupadd --system --gid 10001 liquet \
+    && useradd --system --uid 10001 --gid liquet --home-dir /srv --shell /usr/sbin/nologin liquet
 
 COPY --from=builder /opt/venv /opt/venv
 
 WORKDIR /srv
-COPY --chown=planklar:planklar app ./app
+COPY --chown=liquet:liquet app ./app
 # Regelkatalog im Image, damit Image-Tag und Regelstand zusammenpassen; per Volume überschreibbar.
-COPY --chown=planklar:planklar rules ./rules
+COPY --chown=liquet:liquet rules ./rules
 
-USER planklar
+USER liquet
 EXPOSE 8000
 
 HEALTHCHECK --interval=30s --timeout=5s --start-period=10s --retries=3 \

@@ -14,7 +14,7 @@ from typing import Any, Protocol
 
 import jsonschema
 
-from app.config import get_settings
+from app.pipeline.llm_config import LLMConfig, load_config
 
 
 class LLMError(Exception):
@@ -22,7 +22,7 @@ class LLMError(Exception):
 
 
 class LLMConfigError(LLMError):
-    """Konfiguration unvollständig (z. B. `LLM_MODEL` fehlt)."""
+    """Konfiguration unvollständig (z. B. kein Modell gesetzt)."""
 
 
 class LLMResponseError(LLMError):
@@ -58,7 +58,13 @@ class LLMClient(Protocol):
 
 
 class LiteLLMClient:
-    """Produktiver Client über LiteLLM; Modell aus `LLM_MODEL`."""
+    """Produktiver Client über LiteLLM; Konfiguration aus GUI-Einstellungen oder Umgebung.
+
+    `model` überschreibt das konfigurierte Modell (z. B. für Evaluationsläufe) samt Schlüssel.
+    """
+
+    def __init__(self, model: str | None = None) -> None:
+        self._model = model
 
     def complete(
         self,
@@ -71,9 +77,13 @@ class LiteLLMClient:
     ) -> RawCompletion:
         import litellm
 
-        settings = get_settings()
-        if not settings.llm_model:
-            raise LLMConfigError("LLM_MODEL ist nicht gesetzt")
+        config = load_config()
+        if self._model and self._model != config.model:
+            # Anderes Modell: Schlüssel/Endpunkt der Konfiguration gehören nicht dazu; LiteLLM
+            # nimmt dann die Standard-Variablen des Anbieters (ANTHROPIC_API_KEY, OPENAI_API_KEY).
+            config = LLMConfig(self._model, "", "")
+        if not config.model:
+            raise LLMConfigError("Kein KI-Modell konfiguriert")
 
         content: list[dict[str, Any]] = [{"type": "text", "text": question}]
         if text is not None:
@@ -85,8 +95,9 @@ class LiteLLMClient:
 
         try:
             response = litellm.completion(
-                model=settings.llm_model,
-                api_key=settings.llm_api_key or None,
+                model=config.model,
+                api_key=config.api_key or None,
+                api_base=config.api_base or None,
                 messages=[{"role": "user", "content": content}],
                 response_format={
                     "type": "json_schema",
@@ -100,7 +111,7 @@ class LiteLLMClient:
         message = response.choices[0].message.content
         if not isinstance(message, str):
             raise LLMResponseError("Leere Antwort des Modells")
-        return RawCompletion(text=message, model=str(response.model or settings.llm_model))
+        return RawCompletion(text=message, model=str(response.model or config.model))
 
 
 @dataclass

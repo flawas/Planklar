@@ -32,3 +32,4 @@ button { padding: .5rem 1rem; border: 0; border-radius: 4px; background: var(--a
 .gruppe { margin-bottom: .75rem; display: grid; gap: .25rem; }
 .aktionen { display: flex; gap: .75rem; }
 button.zweit { background: #fff; color: var(--akzent); border: 2px solid var(--akzent); }
+.ok { color: #14532d; border-left: 4px solid #14532d; padding: .5rem .75rem; }

@@ -5,14 +5,17 @@ from fastapi_users import exceptions
 from sqlalchemy.orm import Session
 
 from app.auth import einladung as svc
+from app.auth import verwaltung
 from app.auth.schemas import (
     AdminUserCreate,
     EinladungCreate,
     EinladungRead,
+    PasswordChange,
     ResetAnfrage,
     TokenEinloesen,
     UserCreate,
     UserRead,
+    UserUpdate,
 )
 from app.auth.tokens import TokenError
 from app.auth.users import (
@@ -21,6 +24,7 @@ from app.auth.users import (
     current_user,
     fastapi_users,
     get_user_manager,
+    hash_password,
     require_buero_admin,
 )
 from app.db.models import User
@@ -35,6 +39,25 @@ auth_router.include_router(fastapi_users.get_auth_router(cookie_backend))
 @auth_router.get("/me", response_model=UserRead)
 def me(user: User = Depends(current_user)) -> User:
     return user
+
+
+@auth_router.post("/me/password", status_code=status.HTTP_204_NO_CONTENT)
+async def change_password(
+    payload: PasswordChange,
+    user: User = Depends(current_user),
+    manager: UserManager = Depends(get_user_manager),
+) -> None:
+    """Passwort am eigenen Konto ändern; das alte Passwort ist Pflicht."""
+    verified, _ = manager.password_helper.verify_and_update(
+        payload.old_password, user.hashed_password
+    )
+    if not verified:
+        raise HTTPException(status.HTTP_400_BAD_REQUEST, "INVALID_OLD_PASSWORD")
+    try:
+        await manager.validate_password(payload.new_password, user)
+    except exceptions.InvalidPasswordException:
+        raise HTTPException(status.HTTP_400_BAD_REQUEST, "INVALID_PASSWORD") from None
+    await manager.user_db.update(user, {"hashed_password": hash_password(payload.new_password)})
 
 
 admin_router = APIRouter(prefix="/admin", tags=["admin"])
@@ -146,3 +169,41 @@ async def reset_einloesen(
     except TokenError as exc:
         raise _token_fehler(exc) from None
     return Response(status_code=status.HTTP_204_NO_CONTENT)
+
+
+@admin_router.get("/users", response_model=list[UserRead])
+def list_users(
+    admin: User = Depends(require_buero_admin), session: Session = Depends(get_session)
+) -> list[User]:
+    return verwaltung.list_users(session, admin.buero_id)
+
+
+@admin_router.patch("/users/{user_id}", response_model=UserRead)
+def update_user(
+    user_id: uuid.UUID,
+    payload: UserUpdate,
+    admin: User = Depends(require_buero_admin),
+    session: Session = Depends(get_session),
+) -> User:
+    try:
+        return verwaltung.update_user(
+            session, admin.buero_id, user_id, rolle=payload.rolle, is_active=payload.is_active
+        )
+    except verwaltung.UserNotFoundError:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "Nicht gefunden") from None
+    except verwaltung.LastAdminError:
+        raise HTTPException(status.HTTP_409_CONFLICT, "LAST_ADMIN") from None
+
+
+@admin_router.delete("/users/{user_id}", status_code=status.HTTP_204_NO_CONTENT)
+def delete_user(
+    user_id: uuid.UUID,
+    admin: User = Depends(require_buero_admin),
+    session: Session = Depends(get_session),
+) -> None:
+    try:
+        verwaltung.delete_user(session, admin.buero_id, user_id)
+    except verwaltung.UserNotFoundError:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "Nicht gefunden") from None
+    except verwaltung.LastAdminError:
+        raise HTTPException(status.HTTP_409_CONFLICT, "LAST_ADMIN") from None

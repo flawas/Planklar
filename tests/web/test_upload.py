@@ -129,7 +129,9 @@ def test_verschluesselt(client: TestClient, db: Session, setup) -> None:  # type
 def test_upload_ohne_dateien(client: TestClient, db: Session, setup) -> None:  # type: ignore[no-untyped-def]
     _, dossier, tok = setup
     r = client.post(
-        f"/ui/dossiers/{dossier.id}/upload", data={"csrf_token": tok}, headers={"HX-Request": "true"}
+        f"/ui/dossiers/{dossier.id}/upload",
+        data={"csrf_token": tok},
+        headers={"HX-Request": "true"},
     )
     assert r.status_code == 400
     assert "<html" not in r.text

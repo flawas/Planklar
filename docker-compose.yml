@@ -1,0 +1,72 @@
+# Lokale Entwicklung: docker compose up -d --build
+# Web: http://localhost:8000 (GET /health), S3-API: http://localhost:8333
+
+x-app: &app
+  build: .
+  image: planklar:dev
+  environment:
+    DATABASE_URL: postgresql+psycopg://planklar:planklar@db:5432/planklar
+    REDIS_URL: redis://redis:6379/0
+    S3_ENDPOINT: http://s3:8333
+    LLM_MODEL: ${LLM_MODEL:-}
+    LLM_API_KEY: ${LLM_API_KEY:-}
+    RETENTION_DAYS: ${RETENTION_DAYS:-30}
+    AUTH_SECRET: ${AUTH_SECRET:-dev-only-change-me}
+    AUTH_COOKIE_SECURE: ${AUTH_COOKIE_SECURE:-false}
+  depends_on:
+    db:
+      condition: service_healthy
+    redis:
+      condition: service_healthy
+  restart: unless-stopped
+
+services:
+  web:
+    <<: *app
+    command: ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000"]
+    ports:
+      - "8000:8000"
+
+  worker:
+    <<: *app
+    command: ["celery", "-A", "app.worker", "worker", "--concurrency=2"]
+    # Der Healthcheck des Images prüft HTTP und passt nicht zum Worker.
+    healthcheck:
+      disable: true
+
+  db:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: planklar
+      POSTGRES_PASSWORD: planklar
+      POSTGRES_DB: planklar
+    volumes:
+      - db-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U planklar"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+    restart: unless-stopped
+
+  redis:
+    image: redis:7-alpine
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+    restart: unless-stopped
+
+  s3:
+    image: chrislusf/seaweedfs:latest
+    command: ["server", "-dir=/data", "-s3"]
+    ports:
+      - "8333:8333"
+    volumes:
+      - s3-data:/data
+    restart: unless-stopped
+
+volumes:
+  db-data:
+  s3-data:

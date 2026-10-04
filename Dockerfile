@@ -37,7 +37,6 @@ COPY --from=builder /opt/venv /opt/venv
 WORKDIR /srv
 COPY --chown=liquet:liquet alembic.ini ./alembic.ini
 COPY --chown=liquet:liquet app ./app
-COPY --chown=liquet:liquet alembic.ini ./alembic.ini
 # Regelkatalog im Image, damit Image-Tag und Regelstand zusammenpassen; per Volume überschreibbar.
 COPY --chown=liquet:liquet rules ./rules
 

@@ -18,6 +18,7 @@ from app.auth.users import (
 from app.config import get_settings
 from app.db.models import Dossier, Ergebnis, Pruefung, User
 from app.db.session import get_session
+from app.dossiers.pruefung import LEASE
 from app.dossiers.router import start_pruefung_endpoint
 from app.dossiers.scope import BueroScope, NotFoundError
 from app.dossiers.service import UploadError, basename, get_storage, upload_dokument
@@ -192,6 +193,10 @@ def logout(request: Request, csrf_token: Annotated[str, Form()] = "") -> Respons
     return response
 
 
+def _letzte_pruefung(scope: BueroScope, dossier_id: uuid.UUID) -> Pruefung | None:
+    return next(iter(reversed(scope.list_pruefungen(dossier_id))), None)
+
+
 @web_router.get("/dossiers/{dossier_id}/ansicht", response_model=None)
 def dossier_seite(
     request: Request,
@@ -215,7 +220,7 @@ def dossier_seite(
         dokumente=dokumente,
         unterlagen=unterlagen.unterlagen_zeilen(dossier, dokumente),
         ergebnisse=[],
-        letzte_pruefung=next(iter(reversed(scope.list_pruefungen(dossier.id))), None),
+        pruefung=_letzte_pruefung(scope, dossier.id),
     )
 
 
@@ -454,6 +459,7 @@ def pruefung_starten(
 ) -> Response:
     if user is None:
         return RedirectResponse("/login", status.HTTP_303_SEE_OTHER)
+    htmx = bool(request.headers.get("HX-Request"))
     if not csrf.matches(request.cookies.get(csrf.CSRF_COOKIE), csrf_token):
         return _render(request, "_fehler.html", user=user, status_code=403, error=MSG_CSRF)
     scope = BueroScope(session, user.buero_id)
@@ -463,12 +469,53 @@ def pruefung_starten(
         if exc.status_code == status.HTTP_404_NOT_FOUND:
             return _render(request, "nicht_gefunden.html", user=user, status_code=404)
         meldung = MSG_START.get(str(exc.detail), MSG_START["WORKER_NICHT_ERREICHBAR"])
+        if htmx:
+            return _pruefstatus_antwort(
+                request, user, scope, dossier_id, fehler=meldung, status_code=exc.status_code
+            )
         return _render(
             request, "_fehler.html", user=user, status_code=exc.status_code, error=meldung
         )
+    if htmx:
+        return _pruefstatus_antwort(request, user, scope, dossier_id)
     return RedirectResponse(
         f"/dossiers/{dossier_id}/pruefungen/{pruefung.id}/bericht", status.HTTP_303_SEE_OTHER
     )
+
+
+def _pruefstatus_antwort(
+    request: Request,
+    user: User,
+    scope: BueroScope,
+    dossier_id: uuid.UUID,
+    *,
+    fehler: str | None = None,
+    status_code: int = 200,
+) -> Response:
+    return _render(
+        request, "_pruefstatus.html", user=user, status_code=status_code,
+        dossier=scope.get_dossier(dossier_id), pruefung=_letzte_pruefung(scope, dossier_id),
+        fehler=fehler,
+    )  # fmt: skip
+
+
+@web_router.get("/dossiers/{dossier_id}/pruefstatus", response_model=None)
+def pruefstatus(
+    request: Request,
+    dossier_id: uuid.UUID,
+    user: Annotated[User | None, Depends(_optional_user)],
+    session: Session = Depends(get_session),
+) -> Response:
+    if user is None:
+        return _render(request, "_fehler.html", status_code=401, error=MSG_NOT_LOGGED_IN)
+    scope = BueroScope(session, user.buero_id)
+    try:
+        scope.get_dossier(dossier_id)
+        scope.hat_aktiven_lauf(dossier_id, LEASE)  # markiert verwaiste Läufe als fehlgeschlagen
+        session.commit()
+        return _pruefstatus_antwort(request, user, scope, dossier_id)
+    except NotFoundError:
+        return _render(request, "nicht_gefunden.html", user=user, status_code=404)
 
 
 @web_router.get("/dossiers/{dossier_id}/pruefungen/{pruefung_id}/bericht", response_model=None)

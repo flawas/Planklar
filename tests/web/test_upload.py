@@ -7,7 +7,7 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.config import get_settings
-from app.db.models import Dokument, Dossier, User
+from app.db.models import Dokument, Dossier, Kanton, User
 from app.storage import Storage
 from tests.auth.conftest import make_user
 from tests.dossiers.conftest import make_pdf
@@ -142,3 +142,43 @@ def test_htmx_tauscht_fehlerantworten(client: TestClient, setup) -> None:  # typ
     html = client.get(f"/dossiers/{dossier.id}/ansicht").text
     assert 'name="htmx-config"' in html
     assert '"code":"[45]..","swap":true' in html
+
+
+def test_seite_zeigt_erwartete_unterlagen_mit_quelle(client: TestClient, setup) -> None:  # type: ignore[no-untyped-def]
+    _, dossier, _ = setup
+    html = client.get(f"/dossiers/{dossier.id}/ansicht").text
+    assert "Erwartete Unterlagen" in html
+    assert "Baugesuchsformular" in html and "Grundriss" in html
+    assert "Stand 20" in html and 'rel="noopener noreferrer"' in html
+    assert "keine Prüfung" in html
+
+
+def test_unterlagen_verknuepft_mit_klassifizierten_seiten(
+    client: TestClient,
+    db: Session,
+    setup,  # type: ignore[no-untyped-def]
+) -> None:
+    from app.db.models import Seite
+
+    _, dossier, tok = setup
+    up(client, dossier, [("plan.pdf", make_pdf(2, "p"))], tok)
+    dok = db.scalars(select(Dokument)).one()
+    dok.seiten.append(Seite(nummer=2, plantyp="Grundriss"))
+    db.commit()
+    html = client.get(f"/dossiers/{dossier.id}/ansicht").text
+    assert "plan.pdf (S. 2)" in html
+
+
+def test_upload_antwort_aktualisiert_unterlagenliste(client: TestClient, setup) -> None:  # type: ignore[no-untyped-def]
+    _, dossier, tok = setup
+    r = up(client, dossier, [("a.pdf", make_pdf(1, "a"))], tok)
+    assert "Erwartete Unterlagen" in r.text
+
+
+def test_kanton_ohne_katalog_zeigt_hinweis(client: TestClient, db: Session, setup) -> None:  # type: ignore[no-untyped-def]
+    _, dossier, _ = setup
+    dossier.kanton = Kanton.SZ
+    db.commit()
+    r = client.get(f"/dossiers/{dossier.id}/ansicht")
+    assert r.status_code == 200
+    assert "noch keine Regeln hinterlegt" in r.text

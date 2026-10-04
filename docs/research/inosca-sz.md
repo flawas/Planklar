@@ -32,7 +32,7 @@ Recherche zu Issue #49. Stand der Prüfung: 2026-10-04, Repository `github.com/i
 
 ## Inhalt mit Bezug zu Beilagen
 
-- Neun Fragen vom Typ `document`. Vier gehören zum Modul `gesuchsunterlagen`: `dokument-grundstucksangaben` (Pflicht), `dokument-projektplane-projektbeschrieb` (Pflicht), `dokument-gutachten-nachweise-begrundungen` (optional), `dokument-weitere-gesuchsunterlagen` (optional). Zwei weitere Pflichtdokumente hängen an einer Bedingung (Baustellenentwässerung: `dokument-baustelleninstallationsplan`, `dokument-plan-einleitstelle-leitungskatasterplan-versickerungsflaeche`).
+- Neun Fragen vom Typ `document`. Vier gehören zum Modul `gesuchsunterlagen`: `dokument-grundstucksangaben` (Pflicht), `dokument-projektplane-projektbeschrieb` (Pflicht), `dokument-gutachten-nachweise-begrundungen` (optional), `dokument-weitere-gesuchsunterlagen` (optional). Zwei weitere Pflichtdokumente hängen an einer Bedingung (Baustellenentwässerung: `dokument-baustelleninstallationsplan`, `dokument-plan-einleitstelle-leitungskatasterplan-versickerungsfläche`).
 - 62 `info-*`-Fragen (Checkbox «Vorhanden», nicht Pflicht) nennen bedingte Beilagen, z. B. Formular Tierbestand bei Tierbestandsänderung, Sicherheitsdatenblätter bei Gaslager, forstliche Begründung bei Wald. Rund 37 davon enthalten einen Beilagenhinweis. Verlinkt sind PDF-Formulare (`/assets/documents/...`) und amtliche Seiten (`sz.ch`, `map.geo.sz.ch`).
 - Kantonale Gesamtdefinition: kein Gemeindebezug. Die Schwyzer Gemeinden sind nicht als eigene Formularvarianten modelliert; gemeindespezifische Beilagen (Baureglemente) sind darin **nicht** enthalten.
 - Keine Rechtsquellen: Weder Erlass noch Paragraph sind je Frage hinterlegt (nur Freitext in `label`/`hint`).

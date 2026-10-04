@@ -1,10 +1,13 @@
+import uuid
+from dataclasses import dataclass
 from pathlib import Path
 from typing import Annotated
 
-from fastapi import APIRouter, Depends, Form, Request, status
+from fastapi import APIRouter, Depends, File, Form, Request, UploadFile, status
 from fastapi.responses import HTMLResponse, RedirectResponse, Response
 from fastapi.security import OAuth2PasswordRequestForm
 from fastapi.templating import Jinja2Templates
+from sqlalchemy.orm import Session
 
 from app.auth.users import (
     COOKIE_NAME,
@@ -14,6 +17,10 @@ from app.auth.users import (
 )
 from app.config import get_settings
 from app.db.models import User
+from app.db.session import get_session
+from app.dossiers.scope import BueroScope, NotFoundError
+from app.dossiers.service import UploadError, basename, get_storage, upload_dokument
+from app.storage import Storage
 from app.web import csrf
 
 BASE_DIR = Path(__file__).parent
@@ -23,6 +30,24 @@ web_router = APIRouter(tags=["web"], include_in_schema=False)
 
 MSG_LOGIN = "E-Mail oder Passwort ist falsch."
 MSG_CSRF = "Die Sitzung des Formulars ist abgelaufen. Bitte versuchen Sie es erneut."
+MSG_UPLOAD = {
+    "FILE_TOO_LARGE": "Die Datei ist zu gross.",
+    "NOT_A_PDF": "Die Datei ist kein PDF.",
+    "PDF_INVALID": "Das PDF ist beschädigt oder leer.",
+    "PDF_ENCRYPTED": "Das PDF ist passwortgeschützt.",
+    "DUPLICATE": "Doppelt: Dieses Dokument ist im Dossier bereits vorhanden.",
+}
+MSG_KEINE_DATEI = "Bitte wählen Sie mindestens eine Datei aus."
+MSG_NOT_LOGGED_IN = "Bitte melden Sie sich an."
+
+
+@dataclass
+class UploadErgebnis:
+    """View-Model einer Ergebniszeile pro hochgeladener Datei."""
+
+    dateiname: str
+    ok: bool
+    meldung: str
 
 
 def _render(
@@ -115,3 +140,69 @@ def logout(request: Request, csrf_token: Annotated[str, Form()] = "") -> Respons
         samesite=s.auth_cookie_samesite,
     )
     return response
+
+
+@web_router.get("/dossiers/{dossier_id}/ansicht", response_model=None)
+def dossier_seite(
+    request: Request,
+    dossier_id: uuid.UUID,
+    user: Annotated[User | None, Depends(_optional_user)],
+    session: Session = Depends(get_session),
+) -> Response:
+    if user is None:
+        return RedirectResponse("/login", status.HTTP_303_SEE_OTHER)
+    scope = BueroScope(session, user.buero_id)
+    try:
+        dossier = scope.get_dossier(dossier_id)
+    except NotFoundError:
+        return _render(request, "nicht_gefunden.html", user=user, status_code=404)
+    return _render(
+        request,
+        "dossier.html",
+        user=user,
+        dossier=dossier,
+        dokumente=scope.list_dokumente(dossier.id),
+        ergebnisse=[],
+    )
+
+
+@web_router.post("/dossiers/{dossier_id}/upload", response_model=None)
+async def dossier_upload(
+    request: Request,
+    dossier_id: uuid.UUID,
+    user: Annotated[User | None, Depends(_optional_user)],
+    files: Annotated[list[UploadFile] | None, File()] = None,
+    csrf_token: Annotated[str, Form()] = "",
+    session: Session = Depends(get_session),
+    storage: Storage = Depends(get_storage),
+) -> Response:
+    if user is None:
+        return _render(request, "_fehler.html", status_code=401, error=MSG_NOT_LOGGED_IN)
+    if not csrf.matches(request.cookies.get(csrf.CSRF_COOKIE), csrf_token):
+        return _render(request, "_fehler.html", user=user, status_code=403, error=MSG_CSRF)
+    scope = BueroScope(session, user.buero_id)
+    try:
+        dossier = scope.get_dossier(dossier_id)
+    except NotFoundError:
+        return _render(request, "nicht_gefunden.html", user=user, status_code=404)
+    files = [f for f in files or [] if f.filename]
+    if not files:
+        return _render(request, "_fehler.html", user=user, status_code=400, error=MSG_KEINE_DATEI)
+    limit = get_settings().max_upload_bytes
+    ergebnisse: list[UploadErgebnis] = []
+    for file in files:
+        name = basename(file.filename or "")
+        data = await file.read(limit + 1)  # nie mehr als Limit + 1 Byte in den Speicher
+        try:
+            dok = upload_dokument(session, storage, dossier, name, data, limit)
+            ergebnisse.append(UploadErgebnis(name, True, f"Hochgeladen ({dok.seitenzahl} Seiten)."))
+        except UploadError as exc:
+            ergebnisse.append(UploadErgebnis(name, False, MSG_UPLOAD[exc.code]))
+    return _render(
+        request,
+        "_dokumente.html",
+        user=user,
+        dossier=dossier,
+        dokumente=scope.list_dokumente(dossier.id),
+        ergebnisse=ergebnisse,
+    )

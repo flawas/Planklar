@@ -1,10 +1,12 @@
 import logging
 import re
+import uuid
 from datetime import timedelta
 
 import pytest
 from fastapi.testclient import TestClient
 from sqlalchemy import select
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from app import audit
@@ -134,16 +136,47 @@ def test_widerrufene_einladung_unbrauchbar(
     assert r.json()["detail"] == "TOKEN_INVALID"
 
 
-def test_erneute_einladung_widerruft_die_alte(
+def test_zweite_einladung_derselben_adresse_wird_abgewiesen(
+    client: TestClient, db: Session, mailer: FakeMailer
+) -> None:
+    admin_login(client, db)
+    einladen(client, mailer)
+    r = client.post("/admin/einladungen", json={"email": "NEU@x.ch"})
+    assert (r.status_code, r.json()["detail"]) == (409, "INVITATION_ALREADY_OPEN")
+    assert len(mailer.outbox) == 1
+    assert len(client.get("/admin/einladungen").json()) == 1
+
+
+def test_nach_widerruf_ist_neue_einladung_moeglich(
     client: TestClient, db: Session, mailer: FakeMailer
 ) -> None:
     admin_login(client, db)
     alt = einladen(client, mailer)
+    eid = client.get("/admin/einladungen").json()[0]["id"]
+    assert client.delete(f"/admin/einladungen/{eid}").status_code == 204
     neu = einladen(client, mailer)
     r = client.post("/auth/einladung/einloesen", json={"token": alt, "password": NEU})
     assert r.json()["detail"] == "TOKEN_INVALID"
     r = client.post("/auth/einladung/einloesen", json={"token": neu, "password": NEU})
     assert r.status_code == 201
+
+
+def test_abgelaufene_einladung_blockiert_neue_nicht(
+    client: TestClient, db: Session, mailer: FakeMailer
+) -> None:
+    admin_login(client, db)
+    einladen(client, mailer)
+    alt = db.execute(select(Einladung)).scalar_one()
+    alt.expires_at = jetzt() - timedelta(days=1)
+    db.commit()
+    einladen(client, mailer)
+
+
+def test_user_email_eindeutig_ohne_gross_kleinschreibung(db: Session) -> None:
+    make_user(db, "dup@x.ch")
+    with pytest.raises(IntegrityError):
+        make_user(db, "DUP@x.ch")
+    db.rollback()
 
 
 def test_fremdes_buero_kann_nicht_widerrufen_oder_sehen(
@@ -288,3 +321,30 @@ def test_smtp_starttls_login_und_versand(monkeypatch: pytest.MonkeyPatch) -> Non
     s = Settings(smtp_host="h", smtp_port=2525, smtp_user="u", mail_from="f@x.ch")
     SmtpMailer(s).send(Mail("a@x.ch", "b", "t"))
     assert calls == ["connect h:2525", "starttls", "login u", "send"]
+
+
+def test_erneut_senden_ersetzt_alte_einladung(
+    client: TestClient, db: Session, mailer: FakeMailer
+) -> None:
+    admin_login(client, db)
+    alt = einladen(client, mailer)
+    eid = client.get("/admin/einladungen").json()[0]["id"]
+    r = client.post(f"/admin/einladungen/{eid}/erneut")
+    assert r.status_code == 201
+    neu = token_aus(mailer.outbox[-1])
+    assert neu != alt
+    r = client.post("/auth/einladung/einloesen", json={"token": alt, "password": NEU})
+    assert r.json()["detail"] == "TOKEN_INVALID"
+    r = client.post("/auth/einladung/einloesen", json={"token": neu, "password": NEU})
+    assert r.status_code == 201
+
+
+def test_erneut_senden_fremdes_oder_eingeloestes_404(
+    client: TestClient, db: Session, mailer: FakeMailer
+) -> None:
+    admin_login(client, db)
+    token = einladen(client, mailer)
+    eid = client.get("/admin/einladungen").json()[0]["id"]
+    client.post("/auth/einladung/einloesen", json={"token": token, "password": NEU})
+    assert client.post(f"/admin/einladungen/{eid}/erneut").status_code == 404
+    assert client.post(f"/admin/einladungen/{uuid.uuid4()}/erneut").status_code == 404

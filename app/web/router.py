@@ -24,6 +24,7 @@ from app.auth import einladung as einladung_svc
 from app.auth import plattform, verwaltung
 from app.auth.router import change_password
 from app.auth.schemas import PasswordChange
+from app.auth.tokens import jetzt
 from app.auth.users import (
     COOKIE_NAME,
     LoginGesperrtError,
@@ -71,7 +72,15 @@ MSG_BUERO_EMAIL = "Diese E-Mail-Adresse hat bereits ein Konto."
 MSG_BUERO_MAIL_UNGUELTIG = "Bitte geben Sie eine gültige E-Mail-Adresse an."
 MSG_BUERO_NAME = "Bitte geben Sie einen Namen (max. 200 Zeichen) an."
 MSG_BUERO_UNBEKANNT = "Büro nicht gefunden."
+MSG_EINLADUNG_VERSANDT = "Einladung versandt (7 Tage gültig)."
+MSG_EINLADUNG_WIDERRUFEN = "Einladung widerrufen."
+MSG_EINLADUNG_OFFEN = (
+    "Für diese Adresse gibt es bereits eine offene Einladung. "
+    "Senden Sie sie erneut oder widerrufen Sie sie."
+)
+MSG_EINLADUNG_UNBEKANNT = "Einladung nicht gefunden."
 MSG_USER_UNBEKANNT = "Benutzer nicht gefunden."
+MSG_NAME_LANG = "Vor- und Nachname dürfen höchstens 100 Zeichen lang sein."
 MSG_LETZTER_ADMIN = (
     "Der letzte aktive Administrator des Büros kann nicht geändert oder gelöscht werden."
 )
@@ -924,6 +933,32 @@ def _benutzer_pruefen(
     return user, None
 
 
+def _einladungen_seite(
+    request: Request,
+    user: User,
+    session: Session,
+    *,
+    meldung: str | None = None,
+    ok: bool = True,
+    werte: dict[str, str] | None = None,
+    status_code: int = 200,
+) -> Response:
+    return _render(
+        request,
+        "einladungen.html",
+        user=user,
+        status_code=status_code,
+        einladungen=einladung_svc.liste_einladungen(session, user.buero_id),
+        jetzt=jetzt(),
+        meldung=meldung,
+        ok=ok,
+        werte=werte or {"email": "", "rolle": Rolle.MITARBEITER.value},
+    )
+
+
+_einladungen_pruefen = _benutzer_pruefen
+
+
 @web_router.get("/benutzer", response_model=None)
 def benutzer_uebersicht(
     request: Request,
@@ -938,12 +973,112 @@ def benutzer_uebersicht(
     return _benutzer_seite(request, user, session)
 
 
+@web_router.get("/einladungen", response_model=None)
+def einladungen_uebersicht(
+    request: Request,
+    user: Annotated[User | None, Depends(_optional_user)],
+    session: Session = Depends(get_session),
+) -> Response:
+    if user is None:
+        return RedirectResponse("/login", status.HTTP_303_SEE_OTHER)
+    if user.rolle != Rolle.BUERO_ADMIN:
+        return _render(request, "_fehler.html", user=user, status_code=403, error=MSG_FORBIDDEN)
+    return _einladungen_seite(request, user, session)
+
+
+@web_router.post("/einladungen", response_model=None)
+def einladung_senden(
+    request: Request,
+    background: BackgroundTasks,
+    user: Annotated[User | None, Depends(_optional_user)],
+    email: Annotated[str, Form()] = "",
+    rolle: Annotated[str, Form()] = Rolle.MITARBEITER.value,
+    csrf_token: Annotated[str, Form()] = "",
+    session: Session = Depends(get_session),
+    mailer: Mailer = Depends(get_mailer),
+) -> Response:
+    admin, fehler = _einladungen_pruefen(request, user, csrf_token)
+    if admin is None:
+        return fehler  # type: ignore[return-value]
+    werte = {"email": email.strip(), "rolle": rolle}
+
+    def abgelehnt(meldung: str, code: int) -> Response:
+        return _einladungen_seite(
+            request, admin, session, meldung=meldung, ok=False, werte=werte, status_code=code
+        )
+
+    try:
+        TypeAdapter(EmailStr).validate_python(werte["email"])
+        rolle_wert = Rolle(rolle)
+    except (ValidationError, ValueError):
+        return abgelehnt(MSG_BUERO_MAIL_UNGUELTIG, 422)
+    try:
+        _, mail = einladung_svc.erstelle_einladung(
+            session, admin.buero_id, werte["email"], rolle_wert
+        )
+    except einladung_svc.EmailExistiertError:
+        return abgelehnt(MSG_BUERO_EMAIL, 409)
+    except einladung_svc.EinladungOffenError:
+        return abgelehnt(MSG_EINLADUNG_OFFEN, 409)
+    background.add_task(send_safely, mailer, mail)
+    return _einladungen_seite(request, admin, session, meldung=MSG_EINLADUNG_VERSANDT)
+
+
+@web_router.post("/einladungen/{einladung_id}/erneut", response_model=None)
+def einladung_erneut(
+    request: Request,
+    einladung_id: uuid.UUID,
+    background: BackgroundTasks,
+    user: Annotated[User | None, Depends(_optional_user)],
+    csrf_token: Annotated[str, Form()] = "",
+    session: Session = Depends(get_session),
+    mailer: Mailer = Depends(get_mailer),
+) -> Response:
+    admin, fehler = _einladungen_pruefen(request, user, csrf_token)
+    if admin is None:
+        return fehler  # type: ignore[return-value]
+    try:
+        ergebnis = einladung_svc.sende_einladung_erneut(session, admin.buero_id, einladung_id)
+    except einladung_svc.EmailExistiertError:
+        return _einladungen_seite(
+            request, admin, session, meldung=MSG_BUERO_EMAIL, ok=False, status_code=409
+        )
+    if ergebnis is None:
+        return _einladungen_seite(
+            request, admin, session, meldung=MSG_EINLADUNG_UNBEKANNT, ok=False, status_code=404
+        )
+    background.add_task(send_safely, mailer, ergebnis[1])
+    return _einladungen_seite(request, admin, session, meldung=MSG_EINLADUNG_VERSANDT)
+
+
+@web_router.post("/einladungen/{einladung_id}/widerruf", response_model=None)
+def einladung_widerrufen(
+    request: Request,
+    einladung_id: uuid.UUID,
+    user: Annotated[User | None, Depends(_optional_user)],
+    csrf_token: Annotated[str, Form()] = "",
+    session: Session = Depends(get_session),
+) -> Response:
+    admin, fehler = _einladungen_pruefen(request, user, csrf_token)
+    if admin is None:
+        return fehler  # type: ignore[return-value]
+    if not einladung_svc.widerrufe_einladung(session, admin.buero_id, einladung_id):
+        return _einladungen_seite(
+            request, admin, session, meldung=MSG_EINLADUNG_UNBEKANNT, ok=False, status_code=404
+        )
+    return _einladungen_seite(request, admin, session, meldung=MSG_EINLADUNG_WIDERRUFEN)
+    admin, fehler = _benutzer_pruefen(request, user, None)  # type: ignore[arg-type]
+    if fehler:
+        return fehler
+    return _benutzer_seite(request, user, session)
+
+
 def _benutzer_aendern(
     request: Request,
     admin: User,
     session: Session,
     user_id: uuid.UUID,
-    **felder: Rolle | bool,
+    **felder: Rolle | bool | str,
 ) -> Response:
     try:
         verwaltung.update_user(session, admin.buero_id, user_id, admin.id, **felder)  # type: ignore[arg-type]
@@ -1001,6 +1136,59 @@ def benutzer_rolle(
             request, admin, session, meldung=MSG_ROLLE, ok=False, status_code=400
         )
     return _benutzer_aendern(request, admin, session, user_id, rolle=Rolle(rolle))
+
+
+@web_router.post("/benutzer/{user_id}/name", response_model=None)
+def benutzer_name(
+    request: Request,
+    user_id: uuid.UUID,
+    user: Annotated[User | None, Depends(_optional_user)],
+    session: Session = Depends(get_session),
+    csrf_token: Annotated[str, Form()] = "",
+    vorname: Annotated[str, Form()] = "",
+    nachname: Annotated[str, Form()] = "",
+) -> Response:
+    admin, fehler = _benutzer_pruefen(request, user, csrf_token)
+    if fehler or admin is None:
+        return fehler  # type: ignore[return-value]
+    if max(len(vorname.strip()), len(nachname.strip())) > 100:
+        return _benutzer_seite(
+            request, admin, session, meldung=MSG_NAME_LANG, ok=False, status_code=422
+        )
+    return _benutzer_aendern(request, admin, session, user_id, vorname=vorname, nachname=nachname)
+
+
+@web_router.get("/profil", response_model=None)
+def profil_form(
+    request: Request, user: Annotated[User | None, Depends(_optional_user)]
+) -> Response:
+    if user is None:
+        return RedirectResponse("/login", status.HTTP_303_SEE_OTHER)
+    return _render(request, "profil.html", user=user)
+
+
+@web_router.post("/profil", response_model=None)
+def profil_speichern(
+    request: Request,
+    user: Annotated[User | None, Depends(_optional_user)],
+    session: Session = Depends(get_session),
+    csrf_token: Annotated[str, Form()] = "",
+    vorname: Annotated[str, Form()] = "",
+    nachname: Annotated[str, Form()] = "",
+) -> Response:
+    if user is None:
+        return _render(request, "_fehler.html", status_code=401, error=MSG_NOT_LOGGED_IN)
+    if not csrf.matches(request.cookies.get(csrf.CSRF_COOKIE), csrf_token):
+        return _render(request, "_fehler.html", user=user, status_code=403, error=MSG_CSRF)
+    if max(len(vorname.strip()), len(nachname.strip())) > 100:
+        return _render(
+            request, "profil.html", user=user, status_code=422, meldung=MSG_NAME_LANG, ok=False
+        )
+    # Nur der Name: Rolle und Status bleiben unberührt
+    aktualisiert = verwaltung.update_user(
+        session, user.buero_id, user.id, user.id, vorname=vorname, nachname=nachname
+    )
+    return _render(request, "profil.html", user=aktualisiert, meldung=MSG_GESPEICHERT)
 
 
 @web_router.post("/benutzer/{user_id}/status", response_model=None)

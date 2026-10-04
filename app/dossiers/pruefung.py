@@ -22,6 +22,7 @@ from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
 from typing import Any
 
+from app.abrechnung.nutzung import nutzung_erfassen
 from app.config import get_settings
 from app.db import models as db
 from app.dossiers.scope import BueroScope
@@ -208,11 +209,12 @@ def run_pruefung(
         modelle: set[str] = set()
         formularfelder: dict[str, str] = {}
         canton = dossier.kanton.value
-        for dokument in dokumente:
-            _verarbeite_dokument(
-                scope, storage, dossier, dokument, pruefung_id, canton, client, modelle,
-                formularfelder,
-            )  # fmt: skip
+        with nutzung_erfassen(scope.buero_id, pruefung_id):
+            for dokument in dokumente:
+                _verarbeite_dokument(
+                    scope, storage, dossier, dokument, pruefung_id, canton, client, modelle,
+                    formularfelder,
+                )  # fmt: skip
 
         seiten = [s for d in dokumente for s in scope.list_seiten(d.id)]
         evidenz = Evidenz(

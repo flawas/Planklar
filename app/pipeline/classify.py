@@ -41,7 +41,9 @@ def classify_vision(image: bytes, *, client: LLMClient | None = None) -> Klassif
     votes: list[tuple[Plantyp, float]] = []
     try:
         for _ in range(VOTES):
-            data = ask(prompt, VISION_SCHEMA, image=image, client=client).data
+            data = ask(
+                prompt, VISION_SCHEMA, image=image, client=client, zweck="klassifikation"
+            ).data
             votes.append((Plantyp(data["plantyp"]), float(data["konfidenz"])))
     except LLMError:
         return _UNSURE

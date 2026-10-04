@@ -1,19 +1,24 @@
+import re
 import uuid
+from datetime import date
 
 from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Response, status
 from fastapi_users import exceptions
 from sqlalchemy.orm import Session
 
 from app import audit
+from app.abrechnung.nutzung import monatsauswertung
 from app.auth import einladung as svc
 from app.auth import plattform, verwaltung
 from app.auth.schemas import (
     AdminUserCreate,
     BueroCreate,
+    BueroNutzungRead,
     BueroRead,
     BueroUpdate,
     EinladungCreate,
     EinladungRead,
+    ModellNutzungRead,
     PasswordChange,
     ResetAnfrage,
     TokenEinloesen,
@@ -131,6 +136,8 @@ def create_einladung(
         einladung, mail = svc.erstelle_einladung(db, admin.buero_id, payload.email, payload.rolle)
     except svc.EmailExistiertError:
         raise HTTPException(status.HTTP_409_CONFLICT, "EMAIL_ALREADY_REGISTERED") from None
+    except svc.EinladungOffenError:
+        raise HTTPException(status.HTTP_409_CONFLICT, "INVITATION_ALREADY_OPEN") from None
     background.add_task(send_safely, mailer, mail)
     return einladung
 
@@ -140,6 +147,29 @@ def list_einladungen(
     admin: User = Depends(require_buero_admin), db: Session = Depends(get_session)
 ) -> object:
     return svc.liste_einladungen(db, admin.buero_id)
+
+
+@admin_router.post(
+    "/einladungen/{einladung_id}/erneut",
+    response_model=EinladungRead,
+    status_code=status.HTTP_201_CREATED,
+)
+def sende_einladung_erneut(
+    einladung_id: uuid.UUID,
+    background: BackgroundTasks,
+    admin: User = Depends(require_buero_admin),
+    db: Session = Depends(get_session),
+    mailer: Mailer = Depends(get_mailer),
+) -> object:
+    try:
+        ergebnis = svc.sende_einladung_erneut(db, admin.buero_id, einladung_id)
+    except svc.EmailExistiertError:
+        raise HTTPException(status.HTTP_409_CONFLICT, "EMAIL_ALREADY_REGISTERED") from None
+    if ergebnis is None:
+        raise HTTPException(status.HTTP_404_NOT_FOUND)
+    einladung, mail = ergebnis
+    background.add_task(send_safely, mailer, mail)
+    return einladung
 
 
 @admin_router.delete("/einladungen/{einladung_id}", status_code=status.HTTP_204_NO_CONTENT)
@@ -257,6 +287,30 @@ def list_bueros(
     _: User = Depends(require_plattform_admin), session: Session = Depends(get_session)
 ) -> object:
     return plattform.liste_bueros(session)
+
+
+@plattform_router.get("/abrechnung", response_model=list[BueroNutzungRead])
+def abrechnung(
+    monat: str,
+    _: User = Depends(require_plattform_admin),
+    session: Session = Depends(get_session),
+) -> object:
+    """LLM-Nutzung (Aufrufe, Token, Kosten) je Büro für einen Monat `JJJJ-MM`."""
+    if not re.fullmatch(r"\d{4}-(0[1-9]|1[0-2])", monat):
+        raise HTTPException(status.HTTP_422_UNPROCESSABLE_ENTITY, "Monat im Format JJJJ-MM")
+    jahr, nr = (int(t) for t in monat.split("-"))
+    return [
+        BueroNutzungRead(
+            buero_id=b.buero_id,
+            buero=b.buero,
+            aufrufe=b.aufrufe,
+            input_tokens=b.input_tokens,
+            output_tokens=b.output_tokens,
+            kosten_usd=b.kosten_usd,
+            modelle=[ModellNutzungRead(**vars(m)) for m in b.modelle],
+        )
+        for b in monatsauswertung(session, date(jahr, nr, 1))
+    ]
 
 
 @plattform_router.post("/bueros", response_model=BueroRead, status_code=status.HTTP_201_CREATED)

@@ -1,5 +1,6 @@
 import uuid
 from datetime import datetime
+from decimal import Decimal
 
 from fastapi_users import schemas
 from pydantic import BaseModel, ConfigDict, EmailStr, Field
@@ -80,3 +81,24 @@ class BueroRead(BaseModel):
     aktiv: bool
     benutzer: int
     dossiers: int
+
+
+class ModellNutzungRead(BaseModel):
+    modell: str
+    aufrufe: int
+    input_tokens: int
+    output_tokens: int
+    kosten_usd: Decimal
+    ohne_preis: int
+
+
+class BueroNutzungRead(BaseModel):
+    """Verbrauch eines Büros im Monat; nur Zähler, keine Inhalte."""
+
+    buero_id: uuid.UUID
+    buero: str
+    aufrufe: int
+    input_tokens: int
+    output_tokens: int
+    kosten_usd: Decimal
+    modelle: list[ModellNutzungRead]

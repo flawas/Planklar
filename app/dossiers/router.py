@@ -7,14 +7,17 @@ from sqlalchemy.orm import Session
 
 from app.auth.users import current_user
 from app.config import get_settings
-from app.db.models import Dokument, Dossier, User
+from app.db.models import Befund, Dokument, Dossier, Pruefstatus, Pruefung, User
 from app.db.session import get_session
 from app.dossiers.erwartung import ErwarteteUnterlagen, erwartete_unterlagen
+from app.dossiers.pruefung import start_pruefung
 from app.dossiers.schemas import (
+    BefundRead,
     DokumentRead,
     DossierCreate,
     DossierRead,
     DossierUpdate,
+    PruefungRead,
     validate_attribute,
 )
 from app.dossiers.scope import BueroScope, NotFoundError, get_scope, not_found
@@ -27,6 +30,7 @@ from app.dossiers.service import (
     upload_dokument,
 )
 from app.storage import Storage
+from app.worker import run_pruefung_task
 
 dossier_router = APIRouter(prefix="/dossiers", tags=["dossiers"])
 
@@ -115,3 +119,61 @@ async def upload(
         )
     except UploadError as exc:
         raise HTTPException(_STATUS[exc.code], exc.code) from None
+
+
+@dossier_router.post(
+    "/{dossier_id}/pruefungen", response_model=PruefungRead, status_code=status.HTTP_202_ACCEPTED
+)
+def start_pruefung_endpoint(
+    dossier_id: uuid.UUID, scope: BueroScope = Depends(get_scope)
+) -> Pruefung:
+    try:
+        if not scope.list_dokumente(dossier_id):
+            raise HTTPException(status.HTTP_422_UNPROCESSABLE_CONTENT, "KEINE_DOKUMENTE")
+        if any(p.status == Pruefstatus.LAEUFT for p in scope.list_pruefungen(dossier_id)):
+            raise HTTPException(status.HTTP_409_CONFLICT, "PRUEFUNG_LAEUFT")
+        pruefung = start_pruefung(scope, dossier_id)
+    except NotFoundError:
+        raise not_found() from None
+    scope.session.commit()
+    run_pruefung_task.delay(str(scope.buero_id), str(pruefung.id))
+    return pruefung
+
+
+@dossier_router.get("/{dossier_id}/pruefungen", response_model=list[PruefungRead])
+def list_pruefungen(
+    dossier_id: uuid.UUID, scope: BueroScope = Depends(get_scope)
+) -> list[Pruefung]:
+    try:
+        return list(scope.list_pruefungen(dossier_id))
+    except NotFoundError:
+        raise not_found() from None
+
+
+def _pruefung_im_dossier(
+    scope: BueroScope, dossier_id: uuid.UUID, pruefung_id: uuid.UUID
+) -> Pruefung:
+    try:
+        pruefung = scope.get_pruefung(pruefung_id)
+    except NotFoundError:
+        raise not_found() from None
+    if pruefung.dossier_id != dossier_id:
+        raise not_found()
+    return pruefung
+
+
+@dossier_router.get("/{dossier_id}/pruefungen/{pruefung_id}", response_model=PruefungRead)
+def read_pruefung(
+    dossier_id: uuid.UUID, pruefung_id: uuid.UUID, scope: BueroScope = Depends(get_scope)
+) -> Pruefung:
+    return _pruefung_im_dossier(scope, dossier_id, pruefung_id)
+
+
+@dossier_router.get(
+    "/{dossier_id}/pruefungen/{pruefung_id}/befunde", response_model=list[BefundRead]
+)
+def list_befunde(
+    dossier_id: uuid.UUID, pruefung_id: uuid.UUID, scope: BueroScope = Depends(get_scope)
+) -> list[Befund]:
+    _pruefung_im_dossier(scope, dossier_id, pruefung_id)
+    return list(scope.list_befunde(pruefung_id))

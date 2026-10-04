@@ -15,8 +15,8 @@
     dokument: Baugesuchsformular
   check: ki_klassifikation
   schwere: fehlt_blockierend
-  quelle: { erlass: "PBV LU (SRL Nr. 736)", paragraph: "§ 55 Abs. 1", url: "https://srl.lu.ch/app/de/texts_of_law/736/versions/3092" }
-  stand: 2026-10-03
+  quelle: { erlass: "PBV LU (SRL Nr. 736)", paragraph: "§ 55 Abs. 1", url: "https://srl.lu.ch/app/de/texts_of_law/736/versions/4801" }
+  stand: 2026-10-04
 
 # Eigenhändig unterzeichnet als PDF oder mit qualifizierter elektronischer Signatur. Unterschrift ist nicht automatisch prüfbar.
 - id: LU-PBV56-1-unterschriftenblatt
@@ -28,8 +28,8 @@
     dokument: Unterschriftenblatt
   check: manuell
   schwere: fehlt_blockierend
-  quelle: { erlass: "PBV LU (SRL Nr. 736)", paragraph: "§ 56 Abs. 1", url: "https://srl.lu.ch/app/de/texts_of_law/736/versions/3092" }
-  stand: 2026-10-03
+  quelle: { erlass: "PBV LU (SRL Nr. 736)", paragraph: "§ 56 Abs. 1", url: "https://srl.lu.ch/app/de/texts_of_law/736/versions/4801" }
+  stand: 2026-10-04
 
 - id: LU-PBV55-2a-situationsplan
   titel: Situationsplan (in der Regel 1:500)
@@ -40,8 +40,8 @@
     dokument: Situationsplan
   check: ki_klassifikation
   schwere: fehlt_blockierend
-  quelle: { erlass: "PBV LU (SRL Nr. 736)", paragraph: "§ 55 Abs. 2 lit. a", url: "https://srl.lu.ch/app/de/texts_of_law/736/versions/3092" }
-  stand: 2026-10-03
+  quelle: { erlass: "PBV LU (SRL Nr. 736)", paragraph: "§ 55 Abs. 2 lit. a", url: "https://srl.lu.ch/app/de/texts_of_law/736/versions/4801" }
+  stand: 2026-10-04
 
 - id: LU-PBV55-2b-grundriss
   titel: Grundrisspläne aller Geschosse (Mindestmassstab 1:100)
@@ -52,8 +52,8 @@
     dokument: Grundriss
   check: ki_klassifikation
   schwere: fehlt_blockierend
-  quelle: { erlass: "PBV LU (SRL Nr. 736)", paragraph: "§ 55 Abs. 2 lit. b", url: "https://srl.lu.ch/app/de/texts_of_law/736/versions/3092" }
-  stand: 2026-10-03
+  quelle: { erlass: "PBV LU (SRL Nr. 736)", paragraph: "§ 55 Abs. 2 lit. b", url: "https://srl.lu.ch/app/de/texts_of_law/736/versions/4801" }
+  stand: 2026-10-04
 
 - id: LU-PBV55-2b-fassade
   titel: Fassadenpläne (Mindestmassstab 1:100)
@@ -64,8 +64,8 @@
     dokument: Fassade/Ansicht
   check: ki_klassifikation
   schwere: fehlt_blockierend
-  quelle: { erlass: "PBV LU (SRL Nr. 736)", paragraph: "§ 55 Abs. 2 lit. b", url: "https://srl.lu.ch/app/de/texts_of_law/736/versions/3092" }
-  stand: 2026-10-03
+  quelle: { erlass: "PBV LU (SRL Nr. 736)", paragraph: "§ 55 Abs. 2 lit. b", url: "https://srl.lu.ch/app/de/texts_of_law/736/versions/4801" }
+  stand: 2026-10-04
 
 - id: LU-PBV55-2b-schnitt
   titel: Schnittpläne (Mindestmassstab 1:100)
@@ -76,8 +76,8 @@
     dokument: Schnitt
   check: ki_klassifikation
   schwere: fehlt_blockierend
-  quelle: { erlass: "PBV LU (SRL Nr. 736)", paragraph: "§ 55 Abs. 2 lit. b", url: "https://srl.lu.ch/app/de/texts_of_law/736/versions/3092" }
-  stand: 2026-10-03
+  quelle: { erlass: "PBV LU (SRL Nr. 736)", paragraph: "§ 55 Abs. 2 lit. b", url: "https://srl.lu.ch/app/de/texts_of_law/736/versions/4801" }
+  stand: 2026-10-04
 
 - id: LU-PBV55-2c-umgebungsplan
   titel: Umgebungsplan 1:100
@@ -88,8 +88,8 @@
     dokument: Umgebungsplan
   check: ki_klassifikation
   schwere: fehlt_blockierend
-  quelle: { erlass: "PBV LU (SRL Nr. 736)", paragraph: "§ 55 Abs. 2 lit. c", url: "https://srl.lu.ch/app/de/texts_of_law/736/versions/3092" }
-  stand: 2026-10-03
+  quelle: { erlass: "PBV LU (SRL Nr. 736)", paragraph: "§ 55 Abs. 2 lit. c", url: "https://srl.lu.ch/app/de/texts_of_law/736/versions/4801" }
+  stand: 2026-10-04
 
 - id: LU-PBV55-2e-entwaesserungsplan
   titel: Pläne für die Abwasseranlagen (Entwässerungs- und Kanalisationsplan) 1:100
@@ -100,8 +100,8 @@
     dokument: Entwässerungsplan
   check: ki_klassifikation
   schwere: fehlt_blockierend
-  quelle: { erlass: "PBV LU (SRL Nr. 736)", paragraph: "§ 55 Abs. 2 lit. e", url: "https://srl.lu.ch/app/de/texts_of_law/736/versions/3092" }
-  stand: 2026-10-03
+  quelle: { erlass: "PBV LU (SRL Nr. 736)", paragraph: "§ 55 Abs. 2 lit. e", url: "https://srl.lu.ch/app/de/texts_of_law/736/versions/4801" }
+  stand: 2026-10-04
 
 # Bestehend schwarz oder grau, neu rot, abzubrechend gelb.
 - id: LU-PBV55-4-farbkennzeichnung
@@ -113,8 +113,8 @@
     merkmal: farbkennzeichnung_bestand_neu_abbruch
   check: manuell
   schwere: hinweis
-  quelle: { erlass: "PBV LU (SRL Nr. 736)", paragraph: "§ 55 Abs. 4", url: "https://srl.lu.ch/app/de/texts_of_law/736/versions/3092" }
-  stand: 2026-10-03
+  quelle: { erlass: "PBV LU (SRL Nr. 736)", paragraph: "§ 55 Abs. 4", url: "https://srl.lu.ch/app/de/texts_of_law/736/versions/4801" }
+  stand: 2026-10-04
 
 - id: LU-PBV55-5-beilagenverzeichnis
   titel: Beilagen datiert, Pläne nummeriert und im Beilagenverzeichnis aufgeführt
@@ -125,8 +125,8 @@
     merkmal: beilagen_datiert_plaene_nummeriert
   check: manuell
   schwere: hinweis
-  quelle: { erlass: "PBV LU (SRL Nr. 736)", paragraph: "§ 55 Abs. 5", url: "https://srl.lu.ch/app/de/texts_of_law/736/versions/3092" }
-  stand: 2026-10-03
+  quelle: { erlass: "PBV LU (SRL Nr. 736)", paragraph: "§ 55 Abs. 5", url: "https://srl.lu.ch/app/de/texts_of_law/736/versions/4801" }
+  stand: 2026-10-04
 
 # Betrifft § 26/27 WBG, Art. 41c GSchV. Ob ein Gewässerbezug besteht, gibt die Planerin oder der Planer an.
 - id: LU-WEG-gewaesser-querprofil

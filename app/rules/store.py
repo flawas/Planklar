@@ -39,6 +39,7 @@ def lade_katalog(session: Session, git_commit: str, root: Path = DEFAULT_ROOT) -
 
     Ein bereits gespeicherter (Kanton, Gemeinde, Hash) wird nicht dupliziert, auch nicht
     bei parallelem Start mehrerer Web-Prozesse (Advisory-Lock bis zum Commit).
+    Bei unverändertem Hash bleibt der bereits gespeicherte `git_commit` bewusst unverändert.
     """
     sets = _scopes(root)  # Fehler vor jeglichem DB-Zugriff
     session.execute(text("SELECT pg_advisory_xact_lock(hashtext('planklar_regelset_laden'))"))

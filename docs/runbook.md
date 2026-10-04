@@ -71,3 +71,14 @@ Migration 0011 aktiviert RLS auf `dossier`, `dokument`, `seite`, `pruefung`, `be
 2. Web, Worker und Beat verwenden diese Rolle in `DATABASE_URL`; `alembic upgrade head` und `app_role` laufen mit `MIGRATION_DATABASE_URL` (Besitzerrolle, Fallback `DATABASE_URL`).
 3. `REQUIRE_RLS_ROLE=true` (in Compose gesetzt) bricht den Start ab, wenn die App-Rolle Superuser ist oder `BYPASSRLS` hat; sonst warnt das Log mit `DB_ROLE_BYPASSES_RLS`.
 4. Jeder Pfad setzt den Büro-Kontext über `BueroScope` (`app/db/rls.py`). Ohne Kontext liefern Abfragen keine Zeilen, das ist beabsichtigt. Celery-Tasks erhalten `buero_id` als Argument; der Retention-Job setzt den Kontext je Büro.
+
+## Büro-Offboarding (Vertragsende)
+
+Löscht ein Büro unwiderruflich samt Dossiers (inkl. Dokumente, Seiten, Prüfläufe, Befunde), S3-Objekten und Benutzern (revDSG). Andere Büros bleiben unberührt.
+
+1. Büro-ID ermitteln (z. B. im Plattform-Bereich oder `SELECT id, name FROM buero;`) und Vertragsende bzw. Auftrag schriftlich festhalten. Optional vorher ein Backup ziehen (siehe Backup); danach gelöschte Daten verbleiben dort bis zum Ablauf der Backup-Aufbewahrung.
+2. Büro sperren (`aktiv=false`), damit niemand mehr arbeitet.
+3. Ausführen im `web`-Container: `docker compose exec web python -m app.dossiers.offboarding <buero_id> --bestaetigen`. Ohne `--bestaetigen` passiert nichts (Exit 2).
+4. Die Ausgabe nennt nur Anzahlen (Dossiers, Dokumente, Benutzer). Exit 0 = vollständig gelöscht. Bei Exit 1 mit "Fehlgeschlagen" (z. B. Speicher nicht erreichbar) bleibt das Büro bestehen: Ursache beheben und das Kommando erneut ausführen (idempotent).
+5. Enthält das Büro einen Plattform-Admin, bricht das Kommando ab; diesen Benutzer zuvor in ein anderes Büro verschieben bzw. entfernen.
+6. Kontrolle: `SELECT count(*) FROM buero WHERE id = '<buero_id>';` ergibt 0; im Bucket ist das Präfix `buero/<buero_id>/` leer.

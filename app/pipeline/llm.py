@@ -111,6 +111,7 @@ class LiteLLMClient:
                     "json_schema": {"name": "answer", "schema": dict(schema), "strict": True},
                 },
                 temperature=0,
+                drop_params=True,  # z. B. Claude 5 erlaubt nur temperature=1
             )
         except Exception as exc:  # Details können Inhalte enthalten, daher nicht durchreichen
             raise LLMError(f"LLM-Aufruf fehlgeschlagen ({type(exc).__name__})") from None

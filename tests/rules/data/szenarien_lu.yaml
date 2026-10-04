@@ -1,0 +1,228 @@
+# Erwartete Anforderungen (Regel-IDs) je Vorhabenstyp x Gemeinde (LU).
+# Bei Katalogänderung bewusst anpassen; jede Änderung ist im Review sichtbar.
+- name: Luzern-neubau_efh_mfh
+  gemeinde: Luzern
+  vorhaben:
+    vorhabenstyp: neubau_efh_mfh
+    gewaesserbezug: false
+    kantonsstrassenbezug: false
+    waldbezug: false
+    ausserhalb_bauzone: false
+  erwartet:
+  - LU-LUZERN-baugespann
+  - LU-LUZERN-plankopf
+  - LU-LUZERN-raumstempel
+  - LU-LUZERN-schnittlage
+  - LU-LUZERN-unterschriften-plaene
+  - LU-PBV55-1-baugesuchsformular
+  - LU-PBV55-2a-situationsplan
+  - LU-PBV55-2b-fassade
+  - LU-PBV55-2b-grundriss
+  - LU-PBV55-2b-schnitt
+  - LU-PBV55-2c-umgebungsplan
+  - LU-PBV55-2e-entwaesserungsplan
+  - LU-PBV55-5-beilagenverzeichnis
+  - LU-PBV56-1-unterschriftenblatt
+- name: Luzern-umbau_anbau
+  gemeinde: Luzern
+  vorhaben:
+    vorhabenstyp: umbau_anbau
+    gewaesserbezug: false
+    kantonsstrassenbezug: false
+    waldbezug: false
+    ausserhalb_bauzone: false
+  erwartet:
+  - LU-LUZERN-baugespann
+  - LU-LUZERN-plankopf
+  - LU-LUZERN-raumstempel
+  - LU-LUZERN-schnittlage
+  - LU-LUZERN-unterschriften-plaene
+  - LU-PBV55-1-baugesuchsformular
+  - LU-PBV55-2a-situationsplan
+  - LU-PBV55-2b-fassade
+  - LU-PBV55-2b-grundriss
+  - LU-PBV55-2b-schnitt
+  - LU-PBV55-2c-umgebungsplan
+  - LU-PBV55-2e-entwaesserungsplan
+  - LU-PBV55-4-farbkennzeichnung
+  - LU-PBV55-5-beilagenverzeichnis
+  - LU-PBV56-1-unterschriftenblatt
+- name: Luzern-heizungsersatz_waermepumpe
+  gemeinde: Luzern
+  vorhaben:
+    vorhabenstyp: heizungsersatz_waermepumpe
+    gewaesserbezug: false
+    kantonsstrassenbezug: false
+    waldbezug: false
+    ausserhalb_bauzone: false
+  erwartet:
+  - LU-LUZERN-unterschriften-plaene
+  - LU-PBV55-1-baugesuchsformular
+  - LU-PBV55-2a-situationsplan
+  - LU-PBV55-5-beilagenverzeichnis
+  - LU-PBV56-1-unterschriftenblatt
+- name: Weggis-neubau_efh_mfh
+  gemeinde: Weggis
+  vorhaben:
+    vorhabenstyp: neubau_efh_mfh
+    gewaesserbezug: false
+    kantonsstrassenbezug: false
+    waldbezug: false
+    ausserhalb_bauzone: false
+  erwartet:
+  - LU-PBV55-1-baugesuchsformular
+  - LU-PBV55-2a-situationsplan
+  - LU-PBV55-2b-fassade
+  - LU-PBV55-2b-grundriss
+  - LU-PBV55-2b-schnitt
+  - LU-PBV55-2c-umgebungsplan
+  - LU-PBV55-2e-entwaesserungsplan
+  - LU-PBV55-5-beilagenverzeichnis
+  - LU-PBV56-1-unterschriftenblatt
+  - LU-WEGGIS-baugespann
+- name: Weggis-umbau_anbau
+  gemeinde: Weggis
+  vorhaben:
+    vorhabenstyp: umbau_anbau
+    gewaesserbezug: false
+    kantonsstrassenbezug: false
+    waldbezug: false
+    ausserhalb_bauzone: false
+  erwartet:
+  - LU-PBV55-1-baugesuchsformular
+  - LU-PBV55-2a-situationsplan
+  - LU-PBV55-2b-fassade
+  - LU-PBV55-2b-grundriss
+  - LU-PBV55-2b-schnitt
+  - LU-PBV55-2c-umgebungsplan
+  - LU-PBV55-2e-entwaesserungsplan
+  - LU-PBV55-4-farbkennzeichnung
+  - LU-PBV55-5-beilagenverzeichnis
+  - LU-PBV56-1-unterschriftenblatt
+  - LU-WEGGIS-baugespann
+- name: Weggis-heizungsersatz_waermepumpe
+  gemeinde: Weggis
+  vorhaben:
+    vorhabenstyp: heizungsersatz_waermepumpe
+    gewaesserbezug: false
+    kantonsstrassenbezug: false
+    waldbezug: false
+    ausserhalb_bauzone: false
+  erwartet:
+  - LU-PBV55-1-baugesuchsformular
+  - LU-PBV55-2a-situationsplan
+  - LU-PBV55-5-beilagenverzeichnis
+  - LU-PBV56-1-unterschriftenblatt
+- name: Hergiswil-neubau_efh_mfh
+  gemeinde: Hergiswil
+  vorhaben:
+    vorhabenstyp: neubau_efh_mfh
+    gewaesserbezug: false
+    kantonsstrassenbezug: false
+    waldbezug: false
+    ausserhalb_bauzone: false
+  erwartet:
+  - LU-PBV55-1-baugesuchsformular
+  - LU-PBV55-2a-situationsplan
+  - LU-PBV55-2b-fassade
+  - LU-PBV55-2b-grundriss
+  - LU-PBV55-2b-schnitt
+  - LU-PBV55-2c-umgebungsplan
+  - LU-PBV55-2e-entwaesserungsplan
+  - LU-PBV55-5-beilagenverzeichnis
+  - LU-PBV56-1-unterschriftenblatt
+- name: Hergiswil-umbau_anbau
+  gemeinde: Hergiswil
+  vorhaben:
+    vorhabenstyp: umbau_anbau
+    gewaesserbezug: false
+    kantonsstrassenbezug: false
+    waldbezug: false
+    ausserhalb_bauzone: false
+  erwartet:
+  - LU-PBV55-1-baugesuchsformular
+  - LU-PBV55-2a-situationsplan
+  - LU-PBV55-2b-fassade
+  - LU-PBV55-2b-grundriss
+  - LU-PBV55-2b-schnitt
+  - LU-PBV55-2c-umgebungsplan
+  - LU-PBV55-2e-entwaesserungsplan
+  - LU-PBV55-4-farbkennzeichnung
+  - LU-PBV55-5-beilagenverzeichnis
+  - LU-PBV56-1-unterschriftenblatt
+- name: Hergiswil-heizungsersatz_waermepumpe
+  gemeinde: Hergiswil
+  vorhaben:
+    vorhabenstyp: heizungsersatz_waermepumpe
+    gewaesserbezug: false
+    kantonsstrassenbezug: false
+    waldbezug: false
+    ausserhalb_bauzone: false
+  erwartet:
+  - LU-PBV55-1-baugesuchsformular
+  - LU-PBV55-2a-situationsplan
+  - LU-PBV55-5-beilagenverzeichnis
+  - LU-PBV56-1-unterschriftenblatt
+- name: Luzern-neubau-alle-bezuege
+  gemeinde: Luzern
+  vorhaben:
+    vorhabenstyp: neubau_efh_mfh
+    gewaesserbezug: true
+    kantonsstrassenbezug: true
+    waldbezug: true
+    ausserhalb_bauzone: true
+  erwartet:
+  - LU-LUZERN-baugespann
+  - LU-LUZERN-plankopf
+  - LU-LUZERN-raumstempel
+  - LU-LUZERN-schnittlage
+  - LU-LUZERN-unterschriften-plaene
+  - LU-PBV55-1-baugesuchsformular
+  - LU-PBV55-2a-situationsplan
+  - LU-PBV55-2b-fassade
+  - LU-PBV55-2b-grundriss
+  - LU-PBV55-2b-schnitt
+  - LU-PBV55-2c-umgebungsplan
+  - LU-PBV55-2e-entwaesserungsplan
+  - LU-PBV55-5-beilagenverzeichnis
+  - LU-PBV56-1-unterschriftenblatt
+  - LU-WEG-baugrubensicherung-gewaesserraum
+  - LU-WEG-gewaesser-querprofil
+  - LU-WEG-kantonsstrasse-gelaendeschnitt
+  - LU-WEG-wald-querprofil
+- name: Weggis-umbau-ausserhalb-bauzone
+  gemeinde: Weggis
+  vorhaben:
+    vorhabenstyp: umbau_anbau
+    gewaesserbezug: false
+    kantonsstrassenbezug: false
+    waldbezug: false
+    ausserhalb_bauzone: true
+  erwartet:
+  - LU-PBV55-1-baugesuchsformular
+  - LU-PBV55-2a-situationsplan
+  - LU-PBV55-2b-fassade
+  - LU-PBV55-2b-grundriss
+  - LU-PBV55-2b-schnitt
+  - LU-PBV55-2c-umgebungsplan
+  - LU-PBV55-2e-entwaesserungsplan
+  - LU-PBV55-4-farbkennzeichnung
+  - LU-PBV55-5-beilagenverzeichnis
+  - LU-PBV56-1-unterschriftenblatt
+  - LU-WEG-abz-fotos-fassaden
+  - LU-WEGGIS-baugespann
+- name: Weggis-heizung-gewaesser
+  gemeinde: Weggis
+  vorhaben:
+    vorhabenstyp: heizungsersatz_waermepumpe
+    gewaesserbezug: true
+    kantonsstrassenbezug: false
+    waldbezug: false
+    ausserhalb_bauzone: false
+  erwartet:
+  - LU-PBV55-1-baugesuchsformular
+  - LU-PBV55-2a-situationsplan
+  - LU-PBV55-5-beilagenverzeichnis
+  - LU-PBV56-1-unterschriftenblatt
+  - LU-WEG-baugrubensicherung-gewaesserraum
+  - LU-WEG-gewaesser-querprofil

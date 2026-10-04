@@ -23,3 +23,12 @@ button { padding: .5rem 1rem; border: 0; border-radius: 4px; background: var(--a
 .liste { width: 100%; border-collapse: collapse; }
 .liste th, .liste td { text-align: left; padding: .4rem; border-bottom: 1px solid var(--rand); }
 .nur-sr { position: absolute; left: -999px; }
+.assistent fieldset { border: 1px solid var(--rand); border-radius: 4px; padding: .75rem; }
+.assistent legend { font-weight: 600; }
+.assistent { max-width: 36rem; }
+.schritte { display: flex; flex-wrap: wrap; gap: .25rem 1rem; padding: 0; list-style: none; font-size: .9rem; }
+.schritte [aria-current="step"] { font-weight: 700; text-decoration: underline; }
+.option { display: flex; gap: .5rem; align-items: center; padding: .15rem 0; }
+.gruppe { margin-bottom: .75rem; display: grid; gap: .25rem; }
+.aktionen { display: flex; gap: .75rem; }
+button.zweit { background: #fff; color: var(--akzent); border: 2px solid var(--akzent); }

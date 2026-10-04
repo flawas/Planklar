@@ -21,7 +21,7 @@ from app.db.session import get_session
 from app.dossiers.scope import BueroScope, NotFoundError
 from app.dossiers.service import UploadError, basename, get_storage, upload_dokument
 from app.storage import Storage
-from app.web import csrf
+from app.web import csrf, vorhaben
 
 BASE_DIR = Path(__file__).parent
 templates = Jinja2Templates(directory=BASE_DIR / "templates")
@@ -38,6 +38,7 @@ MSG_UPLOAD = {
     "DUPLICATE": "Doppelt: Dieses Dokument ist im Dossier bereits vorhanden.",
 }
 MSG_KEINE_DATEI = "Bitte wählen Sie mindestens eine Datei aus."
+MSG_SCHRITT = "Ungültiger Schritt im Assistenten."
 MSG_NOT_LOGGED_IN = "Bitte melden Sie sich an."
 
 
@@ -206,3 +207,59 @@ async def dossier_upload(
         dokumente=scope.list_dokumente(dossier.id),
         ergebnisse=ergebnisse,
     )
+
+
+def _schritt_antwort(
+    request: Request, user: User, view: vorhaben.SchrittView, status_code: int = 200
+) -> HTMLResponse:
+    """Partial bei HTMX, sonst vollständige Seite (Fallback ohne JavaScript)."""
+    name = "_vorhaben_schritt.html" if request.headers.get("HX-Request") else "vorhaben.html"
+    return _render(request, name, user=user, status_code=status_code, v=view)
+
+
+@web_router.get("/vorhaben/neu", response_model=None)
+def vorhaben_neu(
+    request: Request, user: Annotated[User | None, Depends(_optional_user)]
+) -> Response:
+    if user is None:
+        return RedirectResponse("/login", status.HTTP_303_SEE_OTHER)
+    return _schritt_antwort(request, user, vorhaben.SchrittView(schritt=1, werte={}))
+
+
+@web_router.post("/vorhaben/schritt", response_model=None)
+async def vorhaben_schritt(
+    request: Request,
+    user: Annotated[User | None, Depends(_optional_user)],
+    session: Session = Depends(get_session),
+) -> Response:
+    if user is None:
+        return _render(request, "_fehler.html", status_code=401, error=MSG_NOT_LOGGED_IN)
+    form = {k: v for k, v in (await request.form()).items() if isinstance(v, str)}
+    if not csrf.matches(request.cookies.get(csrf.CSRF_COOKIE), form.get("csrf_token")):
+        return _render(request, "_fehler.html", user=user, status_code=403, error=MSG_CSRF)
+    try:
+        schritt = int(form.get("schritt", "1"))
+    except ValueError:
+        schritt = 0
+    if not 1 <= schritt <= vorhaben.LETZTER_SCHRITT:
+        return _render(request, "_fehler.html", user=user, status_code=400, error=MSG_SCHRITT)
+    werte = vorhaben.bereinigen(form)
+    aktion = form.get("aktion", "weiter")
+    if aktion == "zurueck":
+        return _schritt_antwort(request, user, vorhaben.SchrittView(max(1, schritt - 1), werte))
+    fehler = vorhaben.pruefe_schritt(schritt, werte)
+    if fehler:
+        view = vorhaben.SchrittView(schritt, werte, fehler)
+        return _schritt_antwort(request, user, view, status_code=422)
+    if schritt < vorhaben.LETZTER_SCHRITT:
+        return _schritt_antwort(request, user, vorhaben.SchrittView(schritt + 1, werte))
+    neu = vorhaben.zu_dossier(werte)
+    if neu is None:
+        view = vorhaben.SchrittView(schritt, werte, meldung=vorhaben.MSG_ALLGEMEIN)
+        return _schritt_antwort(request, user, view, status_code=422)
+    dossier = BueroScope(session, user.buero_id).add_dossier(**neu.model_dump())
+    session.commit()
+    ziel = f"/dossiers/{dossier.id}/ansicht"
+    if request.headers.get("HX-Request"):
+        return Response(status_code=204, headers={"HX-Redirect": ziel})
+    return RedirectResponse(ziel, status.HTTP_303_SEE_OTHER)

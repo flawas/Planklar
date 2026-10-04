@@ -1,6 +1,6 @@
 import uuid
 from datetime import datetime
-from typing import Any
+from typing import Any, Literal
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
@@ -23,6 +23,7 @@ class _Attribute(BaseModel):
 
     model_config = ConfigDict(extra="forbid")
 
+    verfahren: Literal["ordentlich", "vereinfacht"] | None = None
     gewaesserbezug: bool | None = None
     kantonsstrassenbezug: bool | None = None
     waldbezug: bool | None = None

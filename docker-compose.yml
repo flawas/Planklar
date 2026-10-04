@@ -3,9 +3,9 @@
 
 x-app: &app
   build: .
-  image: planklar:dev
+  image: liquet:dev
   environment:
-    DATABASE_URL: postgresql+psycopg://planklar:planklar@db:5432/planklar
+    DATABASE_URL: postgresql+psycopg://liquet:liquet@db:5432/liquet
     REDIS_URL: redis://redis:6379/0
     S3_ENDPOINT: http://s3:8333
     LLM_MODEL: ${LLM_MODEL:-}
@@ -32,18 +32,22 @@ services:
     command: ["celery", "-A", "app.worker", "worker", "--concurrency=2"]
     # Der Healthcheck des Images prüft HTTP und passt nicht zum Worker.
     healthcheck:
-      disable: true
+      test: ["CMD-SHELL", "celery -A app.worker inspect ping -d celery@$$HOSTNAME -t 5"]
+      interval: 10s
+      timeout: 10s
+      start_period: 20s
+      retries: 5
 
   db:
     image: postgres:16-alpine
     environment:
-      POSTGRES_USER: planklar
-      POSTGRES_PASSWORD: planklar
-      POSTGRES_DB: planklar
+      POSTGRES_USER: liquet
+      POSTGRES_PASSWORD: liquet
+      POSTGRES_DB: liquet
     volumes:
       - db-data:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U planklar"]
+      test: ["CMD-SHELL", "pg_isready -U liquet"]
       interval: 5s
       timeout: 3s
       retries: 10

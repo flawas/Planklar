@@ -16,7 +16,7 @@ from app.auth.users import (
     get_user_manager,
 )
 from app.config import get_settings
-from app.db.models import Ergebnis, User
+from app.db.models import Dossier, Ergebnis, Pruefung, User
 from app.db.session import get_session
 from app.dossiers.router import start_pruefung_endpoint
 from app.dossiers.scope import BueroScope, NotFoundError
@@ -103,6 +103,50 @@ def home(request: Request, user: Annotated[User | None, Depends(_optional_user)]
     if user is None:
         return RedirectResponse("/login", status.HTTP_303_SEE_OTHER)
     return _render(request, "home.html", user=user)
+
+
+@dataclass
+class VorhabenZeile:
+    """View-Model einer Zeile der Vorhaben-Übersicht."""
+
+    dossier: Dossier
+    typ: str
+    dokumente: int
+    pruefung: Pruefung | None
+
+
+PRUEFSTATUS_TEXT = {
+    "laeuft": "Läuft",
+    "abgeschlossen": "Abgeschlossen",
+    "fehlgeschlagen": "Fehlgeschlagen",
+}
+
+
+@web_router.get("/vorhaben", response_model=None)
+def vorhaben_uebersicht(
+    request: Request,
+    user: Annotated[User | None, Depends(_optional_user)],
+    session: Session = Depends(get_session),
+) -> Response:
+    if user is None:
+        return RedirectResponse("/login", status.HTTP_303_SEE_OTHER)
+    scope = BueroScope(session, user.buero_id)
+    zeilen = [
+        VorhabenZeile(
+            dossier=d,
+            typ=vorhaben.TYPEN.get(d.vorhabenstyp.value, d.vorhabenstyp.value),
+            dokumente=len(scope.list_dokumente(d.id)),
+            pruefung=next(iter(reversed(scope.list_pruefungen(d.id))), None),
+        )
+        for d in reversed(scope.list_dossiers())  # neueste zuerst
+    ]
+    return _render(
+        request,
+        "vorhaben_liste.html",
+        user=user,
+        zeilen=zeilen,
+        pruefstatus=PRUEFSTATUS_TEXT,
+    )
 
 
 @web_router.get("/login", response_model=None)

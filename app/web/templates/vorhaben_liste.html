@@ -1,0 +1,36 @@
+{% extends "base.html" %}
+{% block title %}Meine Vorhaben{% endblock %}
+{% block content %}
+<h1>Meine Vorhaben</h1>
+<p><a href="/vorhaben/neu">Neues Vorhaben erfassen</a></p>
+{% if zeilen %}
+<table class="liste">
+  <caption class="nur-sr">Bestehende Vorhaben, neueste zuerst</caption>
+  <thead>
+    <tr>
+      <th scope="col">Gemeinde</th><th scope="col">Vorhaben</th><th scope="col">Erfasst</th>
+      <th scope="col">Dokumente</th><th scope="col">Letzte Prüfung</th><th scope="col"><span class="nur-sr">Aktionen</span></th>
+    </tr>
+  </thead>
+  <tbody>
+    {% for z in zeilen %}
+    <tr>
+      <td>{{ z.dossier.gemeinde }} ({{ z.dossier.kanton.value }})</td>
+      <td>{{ z.typ }}</td>
+      <td>{{ z.dossier.created_at.strftime("%d.%m.%Y") }}</td>
+      <td>{{ z.dokumente }}</td>
+      <td>
+        {% if z.pruefung %}
+        <a href="/dossiers/{{ z.dossier.id }}/pruefungen/{{ z.pruefung.id }}/bericht">{{ pruefstatus[z.pruefung.status.value] }}</a>
+        ({{ z.pruefung.gestartet_am.strftime("%d.%m.%Y") }})
+        {% else %}Noch keine{% endif %}
+      </td>
+      <td><a href="/dossiers/{{ z.dossier.id }}/ansicht">Öffnen</a></td>
+    </tr>
+    {% endfor %}
+  </tbody>
+</table>
+{% else %}
+<p>Noch keine Vorhaben erfasst.</p>
+{% endif %}
+{% endblock %}

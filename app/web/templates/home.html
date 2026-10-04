@@ -4,26 +4,32 @@
 {% block content %}
 <h1>Willkommen</h1>
 <p class="untertitel">Angemeldet als {{ user.email }}</p>
-<div class="kacheln">
-  <a class="kachel" href="/vorhaben/neu">
-    <span class="kachel-icon">{{ icon("add") }}</span>
-    <strong>Neues Vorhaben</strong>
-    <span class="kachel-text">Dossier anlegen und Unterlagen hochladen</span>
-    <span class="kachel-pfeil">{{ icon("arrow_forward") }}</span>
-  </a>
-  <a class="kachel" href="/vorhaben">
-    <span class="kachel-icon">{{ icon("folder_open") }}</span>
-    <strong>Meine Vorhaben</strong>
-    <span class="kachel-text">Bestehende Dossiers und Prüfberichte</span>
-    <span class="kachel-pfeil">{{ icon("arrow_forward") }}</span>
-  </a>
+<div class="cards">
+  <article class="card card-elevated" aria-labelledby="c-neu">
+    <header class="card-kopf">
+      <span class="avatar">{{ icon("add") }}</span>
+      <div><h2 id="c-neu">Neues Vorhaben</h2><p class="card-sub">Dossier erfassen</p></div>
+    </header>
+    <p class="card-text">Vorhaben Schritt für Schritt angeben, danach Unterlagen hochladen und prüfen lassen.</p>
+    <div class="card-aktionen"><a class="btn" href="/vorhaben/neu">Erfassen</a></div>
+  </article>
+  <article class="card card-filled" aria-labelledby="c-liste">
+    <header class="card-kopf">
+      <span class="avatar">{{ icon("folder_open") }}</span>
+      <div><h2 id="c-liste">Meine Vorhaben</h2><p class="card-sub">Dossiers und Prüfberichte</p></div>
+    </header>
+    <p class="card-text">Bestehende Vorhaben ansehen, Unterlagen ergänzen oder den letzten Bericht öffnen.</p>
+    <div class="card-aktionen"><a class="btn zweit" href="/vorhaben">Öffnen</a></div>
+  </article>
   {% if user.is_superuser %}
-  <a class="kachel kachel-zweit" href="/einstellungen/ki">
-    <span class="kachel-icon">{{ icon("settings") }}</span>
-    <strong>KI-Einstellungen</strong>
-    <span class="kachel-text">Anbieter, Modell und Schlüssel</span>
-    <span class="kachel-pfeil">{{ icon("arrow_forward") }}</span>
-  </a>
+  <article class="card card-outlined" aria-labelledby="c-ki">
+    <header class="card-kopf">
+      <span class="avatar">{{ icon("settings") }}</span>
+      <div><h2 id="c-ki">KI-Einstellungen</h2><p class="card-sub">Nur für Administratoren</p></div>
+    </header>
+    <p class="card-text">Anbieter, Modell und Zugangsschlüssel für die Seitenanalyse festlegen.</p>
+    <div class="card-aktionen"><a class="btn zweit" href="/einstellungen/ki">Konfigurieren</a></div>
+  </article>
   {% endif %}
 </div>
 {% endblock %}

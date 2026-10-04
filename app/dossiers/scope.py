@@ -56,8 +56,21 @@ class BueroScope:
         self.session.flush()
         return dossier
 
+    def list_abgelaufene_dossiers(self, vor: datetime) -> Sequence[Dossier]:
+        """Dossiers des Büros, vor `vor` angelegt und nicht zur Evaluation freigegeben."""
+        stmt = select(Dossier).where(
+            Dossier.buero_id == self.buero_id,
+            Dossier.created_at < vor,
+            Dossier.evaluation_einverstanden.is_(False),
+        )
+        return self.session.scalars(stmt.order_by(Dossier.created_at)).all()
+
     def delete_dossier(self, dossier_id: uuid.UUID) -> None:
-        self.session.delete(self.get_dossier(dossier_id))
+        """Löscht das Dossier samt Dokumenten, Seiten, Prüfläufen und Befunden (nur DB)."""
+        dossier = self.get_dossier(dossier_id)
+        for pruefung in self.list_pruefungen(dossier_id):
+            self.session.delete(pruefung)
+        self.session.delete(dossier)
         self.session.flush()
 
     # Dokument

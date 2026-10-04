@@ -5,7 +5,7 @@ from typing import Any
 
 from pydantic import ValidationError
 
-from app.db.models import Kanton, Vorhabenstyp
+from app.db.models import Dossier, Kanton, Vorhabenstyp
 from app.dossiers.schemas import ATTRIBUT_MODELLE, DossierCreate
 
 SCHRITTE = ("Kanton", "Gemeinde", "Vorhabenstyp", "Verfahren", "Angaben")
@@ -67,6 +67,7 @@ class SchrittView:
     werte: dict[str, str]
     fehler: dict[str, str] = field(default_factory=dict)
     meldung: str = ""
+    dossier_id: str = ""  # gesetzt = bestehendes Dossier bearbeiten
 
     @property
     def titel(self) -> str:
@@ -119,6 +120,23 @@ class SchrittView:
         """Werte, die nicht im aktuellen Schritt bearbeitet werden, als hidden-Felder."""
         sichtbar = {self.feldname} if self.schritt <= 4 else {f.name for f in self.felder}
         return [(n, self.werte[n]) for n in ALLE_FELDER if self.werte.get(n) and n not in sichtbar]
+
+
+def werte_aus_dossier(dossier: Dossier) -> dict[str, str]:
+    """Vorbefüllung des Assistenten aus einem bestehenden Dossier."""
+    attribute = dossier.attribute or {}
+    werte = {
+        "kanton": dossier.kanton.value,
+        "gemeinde": dossier.gemeinde,
+        "vorhabenstyp": dossier.vorhabenstyp.value,
+    }
+    for name, wert in attribute.items():
+        if name not in ALLE_ATTRIBUTFELDER or wert is None:
+            continue
+        werte[name] = ("ja" if wert else "nein") if isinstance(wert, bool) else str(wert)
+    if attribute.get("verfahren"):
+        werte["verfahren"] = attribute["verfahren"]
+    return werte
 
 
 def bereinigen(form: dict[str, str]) -> dict[str, str]:

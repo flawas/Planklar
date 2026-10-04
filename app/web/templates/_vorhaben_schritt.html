@@ -2,6 +2,7 @@
       hx-post="/vorhaben/schritt" hx-target="#assistent" hx-swap="outerHTML">
   <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
   <input type="hidden" name="schritt" value="{{ v.schritt }}">
+  {% if v.dossier_id %}<input type="hidden" name="dossier_id" value="{{ v.dossier_id }}">{% endif %}
   {% for name, wert in v.versteckt %}
   <input type="hidden" name="{{ name }}" value="{{ wert }}">
   {% endfor %}
@@ -61,7 +62,7 @@
     <button type="submit" name="aktion" value="zurueck" class="zweit" formnovalidate>Zurück</button>
     {% endif %}
     {% if v.letzter %}
-    <button type="submit" name="aktion" value="fertig">Dossier anlegen</button>
+    <button type="submit" name="aktion" value="fertig">{% if v.dossier_id %}Änderungen speichern{% else %}Dossier anlegen{% endif %}</button>
     {% else %}
     <button type="submit" name="aktion" value="weiter">Weiter</button>
     {% endif %}

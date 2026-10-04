@@ -22,6 +22,7 @@ mypy                             # app/rules und app/pipeline
 pytest                           # Tests (tests/ spiegelt app/)
 uvicorn app.main:app --reload    # lokal starten, GET /health
 celery -A app.worker worker --concurrency=2   # Worker (Broker: REDIS_URL)
+celery -A app.worker beat                     # Scheduler (Retention-Job 03:00), genau eine Instanz
 ```
 
 `python -m app.rules.validate` validiert den Regelkatalog (`rules/`).

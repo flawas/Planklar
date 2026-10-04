@@ -101,3 +101,59 @@ def test_other_buero_gets_404(client: TestClient, db: Session) -> None:
     assert client.get("/dossiers").json() == []
     # Eigenes Büro wird nicht über den Body überschreibbar
     assert client.patch(f"/dossiers/{did}", json={"buero_id": str(uuid.uuid4())}).status_code == 422
+
+
+def _unterlagen(client: TestClient, did: str) -> dict:  # type: ignore[type-arg]
+    r = client.get(f"/dossiers/{did}/erwartete-unterlagen")
+    assert r.status_code == 200
+    return r.json()  # type: ignore[no-any-return]
+
+
+def test_erwartete_unterlagen_mit_quelle_und_schwere(client: TestClient, db: Session) -> None:
+    _anmelden(client, db)
+    attribute = {k: False for k in ("gewaesserbezug", "kantonsstrassenbezug", "waldbezug")}
+    attribute["ausserhalb_bauzone"] = False
+    did = client.post("/dossiers", json={**BODY, "attribute": attribute}).json()["id"]
+    data = _unterlagen(client, did)
+    assert data["kanton"] == "LU"
+    assert len(data["regelset_hash"]) == 64
+    ids = {u["regel_id"] for u in data["unterlagen"]}
+    assert "LU-PBV55-1-baugesuchsformular" in ids
+    assert "LU-PBV55-2b-grundriss" in ids
+    for u in data["unterlagen"]:
+        assert u["url"].startswith("http")
+        assert u["erlass"] and u["paragraph"] and u["stand"]
+        assert u["schwere"] in {"fehlt_blockierend", "hinweis"}
+        assert u["anwendbarkeit"] == "anwendbar"
+        assert u["fehlende_variablen"] == []
+
+
+def test_erwartete_unterlagen_vorhabenstyp_filtert(client: TestClient, db: Session) -> None:
+    _anmelden(client, db)
+    body = {**BODY, "vorhabenstyp": "heizungsersatz_waermepumpe", "attribute": {}}
+    did = client.post("/dossiers", json=body).json()["id"]
+    ids = {u["regel_id"] for u in _unterlagen(client, did)["unterlagen"]}
+    assert "LU-PBV55-1-baugesuchsformular" in ids
+    assert "LU-PBV55-2b-grundriss" not in ids
+
+
+def test_erwartete_unterlagen_fehlende_angabe_bleibt_unbekannt(
+    client: TestClient, db: Session
+) -> None:
+    _anmelden(client, db)
+    did = client.post("/dossiers", json={**BODY, "attribute": {}}).json()["id"]
+    unbekannt = [
+        u for u in _unterlagen(client, did)["unterlagen"] if u["anwendbarkeit"] == "unbekannt"
+    ]
+    assert unbekannt
+    assert all(u["fehlende_variablen"] for u in unbekannt)
+
+
+def test_erwartete_unterlagen_fremdes_buero_404(client: TestClient, db: Session) -> None:
+    _anmelden(client, db)
+    did = client.post("/dossiers", json=BODY).json()["id"]
+    client.post("/auth/logout")
+    client.cookies.clear()
+    _anmelden(client, db, "b@buero-b.ch")
+    assert client.get(f"/dossiers/{did}/erwartete-unterlagen").status_code == 404
+    assert client.get(f"/dossiers/{uuid.uuid4()}/erwartete-unterlagen").status_code == 404

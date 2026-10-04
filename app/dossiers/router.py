@@ -9,6 +9,7 @@ from app.auth.users import current_user
 from app.config import get_settings
 from app.db.models import Dokument, Dossier, User
 from app.db.session import get_session
+from app.dossiers.erwartung import ErwarteteUnterlagen, erwartete_unterlagen
 from app.dossiers.schemas import (
     DokumentRead,
     DossierCreate,
@@ -54,6 +55,16 @@ def create_dossier(body: DossierCreate, scope: BueroScope = Depends(get_scope)) 
 def read_dossier(dossier_id: uuid.UUID, scope: BueroScope = Depends(get_scope)) -> Dossier:
     try:
         return scope.get_dossier(dossier_id)
+    except NotFoundError:
+        raise not_found() from None
+
+
+@dossier_router.get("/{dossier_id}/erwartete-unterlagen", response_model=ErwarteteUnterlagen)
+def read_erwartete_unterlagen(
+    dossier_id: uuid.UUID, scope: BueroScope = Depends(get_scope)
+) -> ErwarteteUnterlagen:
+    try:
+        return erwartete_unterlagen(scope.get_dossier(dossier_id))
     except NotFoundError:
         raise not_found() from None
 

@@ -9,7 +9,7 @@ from sqlalchemy.orm import Session
 from app.auth.users import hash_password
 from app.config import get_settings
 from app.db.base import Base
-from app.db.models import Buero, User
+from app.db.models import Buero, Rolle, User
 from app.main import app
 
 PASSWORD = "geheim-123"
@@ -31,13 +31,22 @@ def db(engine: Engine) -> Iterator[Session]:
         yield session
 
 
-def make_user(db: Session, email: str, *, superuser: bool = False, active: bool = True) -> User:
-    buero = Buero(name=f"Büro {uuid.uuid4().hex[:6]}")
+def make_user(
+    db: Session,
+    email: str,
+    *,
+    admin: bool = False,
+    plattform: bool = False,
+    active: bool = True,
+    buero_aktiv: bool = True,
+) -> User:
+    buero = Buero(name=f"Büro {uuid.uuid4().hex[:6]}", aktiv=buero_aktiv)
     user = User(
         buero=buero,
         email=email,
         hashed_password=hash_password(PASSWORD),
-        is_superuser=superuser,
+        rolle=Rolle.BUERO_ADMIN if admin else Rolle.MITARBEITER,
+        is_plattform_admin=plattform,
         is_active=active,
     )
     db.add_all([buero, user])

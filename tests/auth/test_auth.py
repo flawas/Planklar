@@ -66,7 +66,7 @@ def test_keine_oeffentliche_registrierung(client: TestClient, db: Session) -> No
 
 
 def test_admin_legt_benutzer_im_eigenen_buero_an(client: TestClient, db: Session) -> None:
-    admin = make_user(db, "admin@buero-a.ch", superuser=True)
+    admin = make_user(db, "admin@buero-a.ch", admin=True)
     login(client, "admin@buero-a.ch")
     r = client.post("/admin/users", json={"email": "neu@buero-a.ch", "password": PASSWORD})
     assert r.status_code == 201
@@ -76,7 +76,7 @@ def test_admin_legt_benutzer_im_eigenen_buero_an(client: TestClient, db: Session
     assert login(client, "neu@buero-a.ch").status_code == 204
 
 
-def test_admin_endpunkt_nur_fuer_superuser(client: TestClient, db: Session) -> None:
+def test_admin_endpunkt_nur_fuer_buero_admin(client: TestClient, db: Session) -> None:
     make_user(db, "a@buero-a.ch")
     login(client, "a@buero-a.ch")
     r = client.post("/admin/users", json={"email": "neu@x.ch", "password": PASSWORD})
@@ -89,7 +89,7 @@ def test_admin_endpunkt_ohne_login_401(client: TestClient, db: Session) -> None:
 
 
 def test_doppelte_email_409(client: TestClient, db: Session) -> None:
-    make_user(db, "admin@buero-a.ch", superuser=True)
+    make_user(db, "admin@buero-a.ch", admin=True)
     login(client, "admin@buero-a.ch")
     r = client.post("/admin/users", json={"email": "admin@buero-a.ch", "password": PASSWORD})
     assert r.status_code == 409
@@ -103,7 +103,7 @@ def test_login_name_mit_wildcard_trifft_keinen_benutzer(client: TestClient, db: 
 
 
 def test_email_mit_unterstrich_ist_kein_duplikat(client: TestClient, db: Session) -> None:
-    make_user(db, "admin@buero-a.ch", superuser=True)
+    make_user(db, "admin@buero-a.ch", admin=True)
     make_user(db, "aXb@x.ch")
     login(client, "admin@buero-a.ch")
     r = client.post("/admin/users", json={"email": "a_b@x.ch", "password": PASSWORD})
@@ -144,3 +144,28 @@ def test_seed_admin_kann_sich_anmelden(client: TestClient, db: Session) -> None:
     user = seed_admin(db, "Büro Seed", "seed@buero.ch", PASSWORD)
     assert user.is_superuser
     assert login(client, "seed@buero.ch").status_code == 204
+
+
+def test_plattform_admin_ist_kein_buero_admin(client: TestClient, db: Session) -> None:
+    make_user(db, "p@buero-a.ch", plattform=True)
+    login(client, "p@buero-a.ch")
+    r = client.post("/admin/users", json={"email": "neu@x.ch", "password": PASSWORD})
+    assert r.status_code == 403
+
+
+def test_login_gesperrtes_buero_verweigert(client: TestClient, db: Session) -> None:
+    make_user(db, "a@buero-a.ch", buero_aktiv=False)
+    assert login(client, "a@buero-a.ch").status_code == 400
+
+
+def test_bestehende_sitzung_gesperrtes_buero_401(client: TestClient, db: Session) -> None:
+    user = make_user(db, "a@buero-a.ch")
+    assert login(client, "a@buero-a.ch").status_code == 204
+    user.buero.aktiv = False
+    db.commit()
+    assert client.get("/auth/me").status_code == 401
+
+
+def test_plattform_admin_loggt_trotz_gesperrtem_buero_ein(client: TestClient, db: Session) -> None:
+    make_user(db, "p@buero-a.ch", plattform=True, buero_aktiv=False)
+    assert login(client, "p@buero-a.ch").status_code == 204

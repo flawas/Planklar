@@ -312,3 +312,36 @@ def _buero_id_uebernehmen(mapper: Any, connection: Connection, target: Any) -> N
 
 for _modell in _ELTERN:
     event.listen(_modell, "before_insert", _buero_id_uebernehmen)
+
+
+class Einladung(Base):
+    """Einladung eines neuen Benutzers in ein Büro. Das Token wird nur gehasht gespeichert."""
+
+    __tablename__ = "einladung"
+
+    id: Mapped[uuid.UUID] = mapped_column(primary_key=True, default=uuid.uuid4)
+    buero_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("buero.id"), index=True)
+    email: Mapped[str] = mapped_column(String(320))
+    rolle: Mapped[Rolle] = mapped_column(
+        _enum(Rolle, "rolle"), default=Rolle.MITARBEITER, server_default=Rolle.MITARBEITER.value
+    )
+    token_hash: Mapped[str] = mapped_column(String(64), unique=True)
+    expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+    used_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    revoked_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+
+
+class PasswortReset(Base):
+    """Einmaliges Reset-Token eines Benutzers (nur gehasht gespeichert)."""
+
+    __tablename__ = "passwort_reset"
+
+    id: Mapped[uuid.UUID] = mapped_column(primary_key=True, default=uuid.uuid4)
+    user_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("user.id", ondelete="CASCADE"), index=True
+    )
+    token_hash: Mapped[str] = mapped_column(String(64), unique=True)
+    expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+    used_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())

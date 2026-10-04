@@ -3,6 +3,7 @@
 import hashlib
 import uuid
 from functools import lru_cache
+from pathlib import PurePosixPath, PureWindowsPath
 
 import pymupdf
 from sqlalchemy import select
@@ -31,6 +32,11 @@ class DossierNotFoundError(Exception):
 @lru_cache
 def get_storage() -> Storage:
     return Storage()
+
+
+def basename(name: str) -> str:
+    """Reiner Dateiname ohne Pfadanteile (POSIX und Windows)."""
+    return PurePosixPath(PureWindowsPath(name).name).name or "dokument.pdf"
 
 
 def get_dossier(session: Session, buero_id: uuid.UUID, dossier_id: uuid.UUID) -> Dossier:

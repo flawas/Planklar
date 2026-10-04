@@ -96,6 +96,20 @@ services:
       - s3-data:/data
     restart: unless-stopped
 
+  # Nur für Backup/Restore (scripts/backup.sh, scripts/restore.sh): `docker compose --profile backup run --rm backup ...`
+  backup:
+    image: amazon/aws-cli:2.17.40
+    profiles: ["backup"]
+    entrypoint: ["aws", "--endpoint-url", "http://s3:8333"]
+    environment:
+      AWS_ACCESS_KEY_ID: ${S3_ACCESS_KEY:-liquet}
+      AWS_SECRET_ACCESS_KEY: ${S3_SECRET_KEY:-liquet}
+      AWS_DEFAULT_REGION: us-east-1
+    volumes:
+      - ${BACKUP_DIR:-./backups}:/backup
+    depends_on:
+      - s3
+
 volumes:
   caddy-data:
   db-data:

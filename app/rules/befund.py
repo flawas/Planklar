@@ -167,12 +167,21 @@ def _plan_merkmal(regel: Regel, evidenz: Evidenz, s: Schwellen) -> Befund:
     return _befund(regel, Ergebnis.ERFUELLT, f"{name} vorhanden", tuple(ok))
 
 
+def _leer(wert: Any) -> bool:
+    """Kein Inhalt: None, leerer String, False, 0 oder leere Collection (im Zweifel nie erfüllt)."""
+    if isinstance(wert, str):
+        return not wert.strip()
+    if isinstance(wert, (bool, int, float, list, tuple, dict, set, frozenset)):
+        return not wert
+    return wert is None
+
+
 def _formularfeld(regel: Regel, evidenz: Evidenz) -> Befund:
     feld = _param(regel, "feld")
     if not isinstance(feld, str) or not feld:
         return _befund(regel, Ergebnis.UNSICHER, "Regel nennt kein Feld")
     wert = evidenz.formularfelder.get(feld)
-    if wert is None or (isinstance(wert, str) and not wert.strip()):
+    if _leer(wert):
         return _befund(regel, Ergebnis.FEHLT, f"Feld {feld} leer oder nicht vorhanden")
     soll = _param(regel, "wert")
     if soll is not None and wert != soll:

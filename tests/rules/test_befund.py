@@ -165,6 +165,18 @@ def test_formularfeld() -> None:
     assert pruefe(r, Evidenz(formularfelder={"bauherr": None})).ergebnis == Ergebnis.FEHLT
 
 
+@pytest.mark.parametrize("wert", [None, "", "  ", False, 0, 0.0, [], {}, ()])
+def test_formularfeld_leere_werte_fehlen(wert: Any) -> None:
+    r = _regel("formularfeld", feld="x")
+    assert pruefe(r, Evidenz(formularfelder={"x": wert})).ergebnis == Ergebnis.FEHLT
+
+
+@pytest.mark.parametrize("wert", [True, 1, "a", ["a"], {"k": 1}])
+def test_formularfeld_gefuellte_werte_erfuellt(wert: Any) -> None:
+    r = _regel("formularfeld", feld="x")
+    assert pruefe(r, Evidenz(formularfelder={"x": wert})).ergebnis == Ergebnis.ERFUELLT
+
+
 def test_formularfeld_sollwert_und_ohne_feld() -> None:
     r = _regel("formularfeld", feld="heizung", wert="waermepumpe")
     assert pruefe(r, Evidenz(formularfelder={"heizung": "oel"})).ergebnis == Ergebnis.FEHLT

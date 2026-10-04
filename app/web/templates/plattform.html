@@ -1,0 +1,54 @@
+{% from "_icons.html" import icon %}
+{% extends "base.html" %}
+{% block title %}Büros{% endblock %}
+{% block content %}
+<h1>Büros</h1>
+<p>Übersicht der Büros dieser Installation. Es werden nur Name, Status und Anzahl Benutzer und
+  Dossiers angezeigt, keine Dossierinhalte.</p>
+{% if meldung %}<p role="status" class="{{ 'ok' if ok else 'fehler' }}">{{ meldung }}</p>{% endif %}
+<table class="liste">
+  <caption class="nur-sr">Büros</caption>
+  <thead>
+    <tr>
+      <th scope="col">Name</th><th scope="col">Status</th><th scope="col">Benutzer</th>
+      <th scope="col">Dossiers</th><th scope="col"><span class="nur-sr">Aktionen</span></th>
+    </tr>
+  </thead>
+  <tbody>
+    {% for b in bueros %}
+    <tr>
+      <td>
+        <form method="post" action="/plattform/{{ b.id }}/name" class="formular">
+          <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+          <label class="nur-sr" for="name-{{ b.id }}">Name von {{ b.name }}</label>
+          <input id="name-{{ b.id }}" name="name" value="{{ b.name }}" maxlength="200" required>
+          <button type="submit" class="zweit">Umbenennen</button>
+        </form>
+      </td>
+      <td>{{ "Aktiv" if b.aktiv else "Gesperrt" }}</td>
+      <td>{{ b.benutzer }}</td>
+      <td>{{ b.dossiers }}</td>
+      <td>
+        <form method="post" action="/plattform/{{ b.id }}/status">
+          <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+          <input type="hidden" name="aktiv" value="{{ '0' if b.aktiv else '1' }}">
+          <button type="submit" class="zweit">{{ "Sperren" if b.aktiv else "Entsperren" }}</button>
+        </form>
+      </td>
+    </tr>
+    {% endfor %}
+  </tbody>
+</table>
+
+<h2>Büro anlegen</h2>
+<p>Der erste Administrator erhält per E-Mail eine Einladung (7 Tage gültig).</p>
+<form method="post" action="/plattform/neu" class="formular">
+  <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+  <label for="neu-name">Name des Büros</label>
+  <input id="neu-name" name="name" value="{{ werte.name }}" maxlength="200" required>
+  <label for="neu-email">E-Mail des ersten Administrators</label>
+  <input id="neu-email" name="admin_email" type="email" value="{{ werte.admin_email }}" required>
+  <button type="submit">Büro anlegen</button>
+</form>
+<p><a class="btn text" href="/">{{ icon("arrow_back") }}Zurück</a></p>
+{% endblock %}

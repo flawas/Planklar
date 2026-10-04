@@ -92,3 +92,10 @@ Löscht ein Büro unwiderruflich samt Dossiers (inkl. Dokumente, Seiten, Prüfl�
 4. Die Ausgabe nennt nur Anzahlen (Dossiers, Dokumente, Benutzer). Exit 0 = vollständig gelöscht. Bei Exit 1 mit "Fehlgeschlagen" (z. B. Speicher nicht erreichbar) bleibt das Büro bestehen: Ursache beheben und das Kommando erneut ausführen (idempotent).
 5. Enthält das Büro einen Plattform-Admin, bricht das Kommando ab; diesen Benutzer zuvor in ein anderes Büro verschieben bzw. entfernen.
 6. Kontrolle: `SELECT count(*) FROM buero WHERE id = '<buero_id>';` ergibt 0; im Bucket ist das Präfix `buero/<buero_id>/` leer.
+
+## Login-Schutz und Audit-Log
+
+- Fehlversuche werden je E-Mail und je IP gezählt (`LOGIN_MAX_FEHLVERSUCHE_EMAIL`=5, `LOGIN_MAX_FEHLVERSUCHE_IP`=20 im Fenster `LOGIN_FENSTER_SEKUNDEN`=900). Danach antwortet der Login mit 429 und `Retry-After`, auch bei richtigem Passwort. Gespeichert werden nur SHA-256-Hashes.
+- Die IP stammt aus `request.client`. Hinter einem Reverse-Proxy muss uvicorn mit `--proxy-headers --forwarded-allow-ips=<Proxy>` laufen, sonst zählt die Proxy-IP.
+- `audit_ereignis` enthält nur IDs und Aktionscodes (Login, Benutzer-, Rollen- und Passwortaktionen), keine Inhalte oder Personendaten.
+- Rollenwechsel, (De-)Aktivierung und Passwortänderung erhöhen `user.session_version`; bestehende Sitzungen enden sofort.

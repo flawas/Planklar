@@ -1,16 +1,15 @@
 """Dokument-Upload ohne HTTP-Wissen: Validierung, Doppel-Erkennung, Ablage."""
 
 import hashlib
-import uuid
 from functools import lru_cache
 from pathlib import PurePosixPath, PureWindowsPath
 
 import pymupdf
-from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from app.db.models import Dokument, Dossier
+from app.dossiers.scope import BueroScope
 from app.pipeline.preprocess import open_pdf
 from app.storage import Storage
 
@@ -25,10 +24,6 @@ class UploadError(Exception):
         self.code = code
 
 
-class DossierNotFoundError(Exception):
-    pass
-
-
 @lru_cache
 def get_storage() -> Storage:
     return Storage()
@@ -37,16 +32,6 @@ def get_storage() -> Storage:
 def basename(name: str) -> str:
     """Reiner Dateiname ohne Pfadanteile (POSIX und Windows)."""
     return PurePosixPath(PureWindowsPath(name).name).name or "dokument.pdf"
-
-
-def get_dossier(session: Session, buero_id: uuid.UUID, dossier_id: uuid.UUID) -> Dossier:
-    """Dossier nur im eigenen Büro; sonst gleich wie nicht vorhanden."""
-    dossier = session.scalar(
-        select(Dossier).where(Dossier.id == dossier_id, Dossier.buero_id == buero_id)
-    )
-    if dossier is None:
-        raise DossierNotFoundError
-    return dossier
 
 
 def _page_count(data: bytes) -> int:
@@ -77,22 +62,18 @@ def upload_dokument(
     if pages < 1:
         raise UploadError("PDF_INVALID")
     sha256 = hashlib.sha256(data).hexdigest()
-    exists = session.scalar(
-        select(Dokument.id).where(Dokument.dossier_id == dossier.id, Dokument.sha256 == sha256)
-    )
-    if exists is not None:
+    scope = BueroScope(session, dossier.buero_id)  # setzt auch den RLS-Kontext
+    if scope.hat_dokument(dossier.id, sha256):
         raise UploadError("DUPLICATE")
     key = storage.put(dossier.buero_id, dossier.id, sha256, data)
-    dokument = Dokument(
-        dossier_id=dossier.id,
-        buero_id=dossier.buero_id,
-        dateiname=dateiname[:500],
-        sha256=sha256,
-        seitenzahl=pages,
-        speicherpfad=key,
-    )
-    session.add(dokument)
     try:
+        dokument = scope.add_dokument(
+            dossier.id,
+            dateiname=dateiname[:500],
+            sha256=sha256,
+            seitenzahl=pages,
+            speicherpfad=key,
+        )
         session.commit()
     except IntegrityError:  # paralleler Upload desselben Dokuments
         session.rollback()

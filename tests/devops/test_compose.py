@@ -6,7 +6,7 @@ DOCKERFILE = (ROOT / "Dockerfile").read_text(encoding="utf-8")
 
 
 def test_web_runs_migrations_before_uvicorn() -> None:
-    cmd = "alembic upgrade head && exec uvicorn app.main:app"
+    cmd = "alembic upgrade head && python -m app.db.app_role && exec uvicorn app.main:app"
     assert cmd in COMPOSE
 
 

@@ -12,7 +12,8 @@ def run_migrations() -> None:
     # Eine bereits übergebene Verbindung (Tests) hat Vorrang vor der Konfiguration.
     connection = context.config.attributes.get("connection")
     if connection is None:
-        engine = create_engine(get_settings().database_url)
+        settings = get_settings()
+        engine = create_engine(settings.migration_database_url or settings.database_url)
         with engine.connect() as connection:
             _run(connection)
         engine.dispose()

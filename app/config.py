@@ -10,6 +10,10 @@ class Settings(BaseSettings):
     model_config = SettingsConfigDict(extra="ignore")
 
     database_url: str = "postgresql+psycopg://liquet:liquet@localhost:5432/liquet"
+    # Alembic läuft mit der Besitzerrolle; ohne Angabe gilt `database_url`.
+    migration_database_url: str = ""
+    # Bricht den Start ab, wenn die App-Rolle RLS umgehen kann (Superuser/BYPASSRLS).
+    require_rls_role: bool = False
     redis_url: str = "redis://localhost:6379/0"
     s3_endpoint: str = "http://localhost:9000"
     s3_access_key: str = "minioadmin"

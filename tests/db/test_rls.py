@@ -1,3 +1,4 @@
+import os
 import uuid
 from collections.abc import Iterator
 from contextlib import contextmanager
@@ -24,7 +25,10 @@ def rls_db(engine: Engine) -> Iterator[Engine]:
         if not conn.scalar(
             text("SELECT rolsuper OR rolbypassrls FROM pg_roles WHERE rolname = current_user")
         ):
-            pytest.skip("Test-DB-Benutzer ist weder Superuser noch BYPASSRLS; Rollenwechsel unklar")
+            msg = "Test-DB-Benutzer ist weder Superuser noch BYPASSRLS; Rollenwechsel unklar"
+            if os.environ.get("CI"):
+                pytest.fail(msg)  # in CI darf der RLS-Beweis nie still entfallen
+            pytest.skip(msg)
     yield engine
 
 
@@ -143,3 +147,33 @@ def test_retention_setzt_kontext_pro_buero(rls_db: Engine) -> None:
         )
         assert len(report.geloescht) == 2
         assert not report.fehlgeschlagen
+
+
+def test_upload_unter_app_rolle_erkennt_duplikate(rls_db: Engine) -> None:
+    from app.dossiers.service import UploadError, upload_dokument
+    from tests.dossiers.conftest import make_pdf
+
+    class _Storage:
+        def put(self, buero_id: uuid.UUID, dossier_id: uuid.UUID, sha256: str, _: bytes) -> str:
+            return f"buero/{buero_id}/dossier/{dossier_id}/{sha256}.pdf"
+
+    a, _ = _seed(rls_db)
+    data = make_pdf(1)
+    with _app_session(rls_db) as s:
+        scope = BueroScope(s, a)
+        dossier = scope.list_dossiers()[0]
+        dok = upload_dokument(s, _Storage(), dossier, "p.pdf", data, 10**8)  # type: ignore[arg-type]
+        assert dok.buero_id == a
+        with pytest.raises(UploadError) as exc:
+            upload_dokument(s, _Storage(), dossier, "p.pdf", data, 10**8)  # type: ignore[arg-type]
+        assert exc.value.code == "DUPLICATE"
+
+
+def test_rls_umgehbar_erkennt_superuser(rls_db: Engine) -> None:
+    from app.db.app_role import rls_umgehbar
+
+    with rls_db.connect() as conn:
+        assert rls_umgehbar(conn)
+        conn.execute(text("SET ROLE liquet_app"))
+        assert not rls_umgehbar(conn)
+        conn.execute(text("RESET ROLE"))

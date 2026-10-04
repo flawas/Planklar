@@ -93,6 +93,13 @@ class BueroScope:
         stmt = select(Dokument).where(Dokument.dossier_id == dossier_id)
         return self.session.scalars(stmt.order_by(Dokument.created_at)).all()
 
+    def hat_dokument(self, dossier_id: uuid.UUID, sha256: str) -> bool:
+        self.get_dossier(dossier_id)
+        stmt = select(Dokument.id).where(
+            Dokument.dossier_id == dossier_id, Dokument.sha256 == sha256
+        )
+        return self.session.scalar(stmt) is not None
+
     def get_dokument(self, dokument_id: uuid.UUID) -> Dokument:
         stmt = (
             select(Dokument)

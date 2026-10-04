@@ -55,7 +55,7 @@ Flow (GitHub Actions in `.github/workflows/`):
 5. `agent-orchestrator.yml` – on merge, `.github/scripts/unblock.sh` flips `status:blocked` to `status:ready` for issues whose dependencies are closed.
 6. `ci.yml` – lint, tests, rule validation, docker build (each job activates once its files exist).
 
-Required secrets: `OP_SERVICE_ACCOUNT_TOKEN` (GitHub secret). The workflows load `AGENT_PAT` (GitHub PAT or App token; item "GitHub Agent PAT") and `CLAUDE_CODE_OAUTH_TOKEN` (item "Claude OAUTH Token") from the 1Password vault "Github Actions". Use a PAT/App token rather than `GITHUB_TOKEN` because events created with the default `GITHUB_TOKEN` do not trigger other workflows, so the chain would stop. Run `.github/scripts/setup-labels.sh` once. Use branch protection on `main` requiring CI.
+Required secrets (GitHub repository secrets): `AGENT_PAT` (GitHub PAT or App token) and `CLAUDE_CODE_OAUTH_TOKEN`. They are read directly from GitHub secrets, not from 1Password (the 1Password API rate-limited the many agent jobs). Use a PAT/App token rather than `GITHUB_TOKEN` because events created with the default `GITHUB_TOKEN` do not trigger other workflows, so the chain would stop. Run `.github/scripts/setup-labels.sh` once. Use branch protection on `main` requiring CI.
 
 ## Datenzugriff (Mandantentrennung)
 

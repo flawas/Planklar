@@ -21,7 +21,7 @@
     <p class="card-text">Bestehende Vorhaben ansehen, Unterlagen ergänzen oder den letzten Bericht öffnen.</p>
     <div class="card-aktionen"><a class="btn zweit" href="/vorhaben">Öffnen</a></div>
   </article>
-  {% if user.is_superuser %}
+  {% if user.is_plattform_admin %}
   <article class="card card-outlined" aria-labelledby="c-ki">
     <header class="card-kopf">
       <span class="avatar">{{ icon("settings") }}</span>

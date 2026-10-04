@@ -2,7 +2,7 @@ import uuid
 from collections.abc import Iterator
 from typing import Any
 
-from fastapi import Depends, Request
+from fastapi import Depends, HTTPException, Request, status
 from fastapi_users import BaseUserManager, FastAPIUsers, UUIDIDMixin, exceptions
 from fastapi_users.authentication import (
     AuthenticationBackend,
@@ -15,7 +15,7 @@ from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from app.config import get_settings
-from app.db.models import User
+from app.db.models import Rolle, User
 from app.db.session import get_session
 
 COOKIE_NAME = "liquet_session"
@@ -71,10 +71,22 @@ class UserManager(UUIDIDMixin, BaseUserManager[User, uuid.UUID]):
         if len(password) < 10:
             raise exceptions.InvalidPasswordException("Passwort zu kurz (mind. 10 Zeichen)")
 
+    async def authenticate(self, credentials: Any) -> User | None:
+        """Wie fastapi-users, verweigert aber Benutzern gesperrter Büros den Login."""
+        user = await super().authenticate(credentials)
+        if user is not None and not buero_ist_aktiv(user):
+            return None
+        return user
+
     async def on_after_login(
         self, user: User, request: Request | None = None, response: Any = None
     ) -> None:
         return None
+
+
+def buero_ist_aktiv(user: User) -> bool:
+    """Plattform-Admins bleiben von der Büro-Sperre ausgenommen (Entsperrung)."""
+    return user.is_plattform_admin or user.buero.aktiv
 
 
 def get_user_db(session: Session = Depends(get_session)) -> Iterator[SyncSQLAlchemyUserDatabase]:
@@ -112,5 +124,23 @@ cookie_backend = AuthenticationBackend[User, uuid.UUID](
 
 fastapi_users = FastAPIUsers[User, uuid.UUID](get_user_manager, [cookie_backend])
 
-current_user = fastapi_users.current_user(active=True)
-current_superuser = fastapi_users.current_user(active=True, superuser=True)
+_active_user = fastapi_users.current_user(active=True)
+
+
+def current_user(user: User = Depends(_active_user)) -> User:
+    """Angemeldeter, aktiver Benutzer eines aktiven Büros (auch für bestehende Sitzungen)."""
+    if not buero_ist_aktiv(user):
+        raise HTTPException(status.HTTP_401_UNAUTHORIZED)
+    return user
+
+
+def require_buero_admin(user: User = Depends(current_user)) -> User:
+    if user.rolle != Rolle.BUERO_ADMIN:
+        raise HTTPException(status.HTTP_403_FORBIDDEN)
+    return user
+
+
+def require_plattform_admin(user: User = Depends(current_user)) -> User:
+    if not user.is_plattform_admin:
+        raise HTTPException(status.HTTP_403_FORBIDDEN)
+    return user

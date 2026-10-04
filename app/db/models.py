@@ -18,9 +18,10 @@ from sqlalchemy import (
     false,
     func,
     text,
+    true,
 )
 from sqlalchemy.dialects.postgresql import JSONB
-from sqlalchemy.orm import Mapped, mapped_column, relationship
+from sqlalchemy.orm import Mapped, mapped_column, relationship, synonym
 
 from app.db.base import Base
 
@@ -28,6 +29,11 @@ from app.db.base import Base
 class Kanton(enum.StrEnum):
     LU = "LU"
     SZ = "SZ"
+
+
+class Rolle(enum.StrEnum):
+    MITARBEITER = "mitarbeiter"
+    BUERO_ADMIN = "buero_admin"
 
 
 class Vorhabenstyp(enum.StrEnum):
@@ -74,6 +80,8 @@ class Buero(Base):
 
     id: Mapped[uuid.UUID] = mapped_column(primary_key=True, default=uuid.uuid4)
     name: Mapped[str] = mapped_column(String(200))
+    # Gesperrte Büros (aktiv=false): Login und bestehende Sitzungen werden abgewiesen
+    aktiv: Mapped[bool] = mapped_column(Boolean, default=True, server_default=true())
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
 
     users: Mapped[list["User"]] = relationship(back_populates="buero")
@@ -87,7 +95,16 @@ class User(Base):
     email: Mapped[str] = mapped_column(String(320), unique=True)
     hashed_password: Mapped[str] = mapped_column(String(1024))
     is_active: Mapped[bool] = mapped_column(Boolean, default=True, server_default="true")
-    is_superuser: Mapped[bool] = mapped_column(Boolean, default=False, server_default="false")
+    rolle: Mapped[Rolle] = mapped_column(
+        _enum(Rolle, "rolle"), default=Rolle.MITARBEITER, server_default=Rolle.MITARBEITER.value
+    )
+    is_plattform_admin: Mapped[bool] = mapped_column(Boolean, default=False, server_default=false())
+    # Legacy-Spalte; fastapi-users kennt nur `is_superuser`, das Attribut zeigt auf
+    # `is_plattform_admin` (ADR 0005). Die Spalte selbst wird nicht mehr gelesen.
+    _is_superuser_legacy: Mapped[bool] = mapped_column(
+        "is_superuser", Boolean, default=False, server_default=false()
+    )
+    is_superuser = synonym("is_plattform_admin")
     is_verified: Mapped[bool] = mapped_column(Boolean, default=False, server_default="false")
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
 

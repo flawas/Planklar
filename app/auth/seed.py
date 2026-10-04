@@ -13,7 +13,7 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.auth.users import hash_password
-from app.db.models import Buero, User
+from app.db.models import Buero, Rolle, User
 from app.db.session import get_sessionmaker
 
 
@@ -23,7 +23,8 @@ def seed_admin(session: Session, buero_name: str, email: str, password: str) -> 
         buero=buero,
         email=email,
         hashed_password=hash_password(password),
-        is_superuser=True,
+        rolle=Rolle.BUERO_ADMIN,
+        is_plattform_admin=True,
         is_verified=True,
     )
     session.add_all([buero, user])

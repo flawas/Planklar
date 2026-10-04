@@ -61,3 +61,5 @@ Required secrets (GitHub repository secrets): `AGENT_PAT` (GitHub PAT or App tok
 ## Datenzugriff (Mandantentrennung)
 
 Dossier, Dokument und Seite werden ausschliesslich über `app.dossiers.scope.BueroScope` gelesen und geschrieben (in Endpunkten via `Depends(get_scope)`). Direkte `select(Dossier)`/`session.get(Dokument, …)` ausserhalb dieser Schicht sind nicht erlaubt. Fremde Objekte lösen `NotFoundError` aus, Endpunkte antworten mit `not_found()` (404). Neue Entitäten (z. B. Prüflauf, Befund) werden in `BueroScope` ergänzt, jeweils mit einem Eintrag im Fremdzugriff-Test `tests/dossiers/test_scope.py`.
+
+Rollen und Mandantenmodell (ein Büro pro Benutzer, `Rolle` + `is_plattform_admin`, Einladung, RLS): `docs/adr/0005-mandanten-und-rollen.md`.

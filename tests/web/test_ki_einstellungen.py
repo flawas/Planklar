@@ -21,7 +21,7 @@ def token(client: TestClient) -> str:
 
 @pytest.fixture
 def admin(client: TestClient, db: Session) -> str:
-    make_user(db, "admin@buero-a.ch", superuser=True)
+    make_user(db, "admin@buero-a.ch", plattform=True)
     do_login(client, "admin@buero-a.ch")
     return token(client)
 
@@ -30,11 +30,13 @@ def speichern(client: TestClient, tok: str, **data: str):  # type: ignore[no-unt
     return client.post(URL, data={"csrf_token": tok, **data})
 
 
-def test_nur_superuser(client: TestClient, db: Session) -> None:
-    make_user(db, "user@buero-a.ch")
+@pytest.mark.parametrize("admin", [False, True])
+def test_nur_plattform_admin(client: TestClient, db: Session, admin: bool) -> None:
+    make_user(db, "user@buero-a.ch", admin=admin)
     do_login(client, "user@buero-a.ch")
-    assert client.get(URL).status_code == 404
-    assert client.post(URL, data={"modell": "x"}).status_code == 404
+    assert client.get(URL).status_code == 403
+    assert client.post(URL, data={"modell": "x"}).status_code == 403
+    assert client.post(URL + "/test", data={}).status_code == 403
 
 
 def test_anonym_wird_zum_login_geleitet(client: TestClient, db: Session) -> None:

@@ -1,0 +1,19 @@
+# Gemeinde Weggis: Ergänzung zur Kantonsbasis (rules/LU/kanton.yaml). Nur formelle Vollständigkeit.
+# Quelle: Merkblatt Baugespann der Abteilung Bau Weggis (Februar 2023); weitere Merkblätter und Formulare sind online verfügbar.
+# Lücken (keine Regel, weil keine belegbare Quelle gelesen werden konnte):
+# - Baureglement Weggis: kein Abruf gelungen, daher keine formellen Beilagenpflichten daraus.
+# - Energienachweis: die Gemeinde verweist auf den Vollzug des Energiegesetzes, nennt aber keinen Paragraphen.
+# - Merkblatt Gestaltungsplan (Modell 1:500): erst relevant, wenn der Vorhaben-Assistent ein Gestaltungsplanverfahren erfasst.
+# - Das Baugespann ist nur bei Veränderung der äusseren Form nötig; dafür fehlt eine Angabe, daher Hinweis statt Pflicht.
+
+- id: LU-WEGGIS-baugespann
+  titel: Baugespann bis zur Einreichung des Baugesuchs erstellt (Neu- und Anbauten, Umbauten mit Veränderung der äusseren Form)
+  scope: { kanton: LU, gemeinde: Weggis }
+  when: { "in": [{ var: vorhabenstyp }, ["neubau_efh_mfh", "umbau_anbau"]] }
+  requires:
+    typ: merkmal
+    merkmal: baugespann_erstellt
+  check: manuell
+  schwere: hinweis
+  quelle: { erlass: "Merkblatt Baugespann, Abteilung Bau Weggis (Februar 2023)", paragraph: "Einleitung, Abschnitt Die auszusteckenden Punkte", url: "https://www.weggis.ch/_doc/4380259" }
+  stand: 2026-10-04

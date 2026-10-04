@@ -1,0 +1,83 @@
+# Gemeinde Stadt Luzern: Overrides und Ergänzungen zur Kantonsbasis (rules/LU/kanton.yaml).
+# Quelle: Merkblatt "Einreichung Baugesuche" der Stadt Luzern, Version 1.1 vom 3. Juni 2025. Nur formelle Vollständigkeit.
+# Lücken (im Merkblatt nicht oder nur projektabhängig geregelt, deshalb keine Regel):
+# - Der Umfang der Unterlagen richtet sich nach der projektbezogenen Checkliste des Ressorts Beratungen; sie liegt nicht öffentlich vor.
+# - Vollmachten und Protokoll der STWE-Versammlung sind nur bei bevollmächtigter Vertretung bzw. gemeinschaftlichem Eigentum
+#   beizulegen; dafür gibt es im Vorhaben-Assistenten keine Angabe.
+# - Papiereinreichung, Upload (CargoServer) und eFormular-Ablauf sind Verfahrensschritte, keine Beilagen.
+# - Die Baugespann-Pflicht gilt auch für Terrainveränderungen und Antennen; der Vorhabenstyp ist dafür zu grob.
+
+# Ersetzt die Kantonsregel gleicher id: Die Stadt verlangt die Checkliste als Beilagenverzeichnis.
+- id: LU-PBV55-5-beilagenverzeichnis
+  titel: Von der Stadt Luzern erstellte Checkliste als Beilagenverzeichnis, Beilagen datiert, Pläne nummeriert
+  scope: { kanton: LU, gemeinde: Luzern }
+  when: true
+  requires:
+    typ: merkmal
+    merkmal: beilagen_datiert_plaene_nummeriert
+  check: manuell
+  schwere: fehlt_blockierend
+  quelle: { erlass: "Merkblatt Einreichung Baugesuche Stadt Luzern (Version 1.1, 3. Juni 2025)", paragraph: "Unterlagen Baugesuch", url: "https://www.stadtluzern.ch/dokumentebilder/publikationen/26195" }
+  stand: 2026-10-04
+
+- id: LU-LUZERN-plankopf
+  titel: Plankopf mit Plannummer, Bezeichnung, Massstab, Datum und Nordpfeil
+  scope: { kanton: LU, gemeinde: Luzern }
+  when: { "in": [{ var: vorhabenstyp }, ["neubau_efh_mfh", "umbau_anbau"]] }
+  requires:
+    typ: merkmal
+    merkmal: plankopf_vollstaendig
+  check: manuell
+  schwere: hinweis
+  quelle: { erlass: "Merkblatt Einreichung Baugesuche Stadt Luzern (Version 1.1, 3. Juni 2025)", paragraph: "Plandarstellung", url: "https://www.stadtluzern.ch/dokumentebilder/publikationen/26195" }
+  stand: 2026-10-04
+
+- id: LU-LUZERN-raumstempel
+  titel: Raumstempel (Nutzung, Bruttofläche, Fensterfläche usw.) in den Grundrissen
+  scope: { kanton: LU, gemeinde: Luzern }
+  when: { "in": [{ var: vorhabenstyp }, ["neubau_efh_mfh", "umbau_anbau"]] }
+  requires:
+    typ: merkmal
+    merkmal: raumstempel
+  check: manuell
+  schwere: hinweis
+  quelle: { erlass: "Merkblatt Einreichung Baugesuche Stadt Luzern (Version 1.1, 3. Juni 2025)", paragraph: "Plandarstellung", url: "https://www.stadtluzern.ch/dokumentebilder/publikationen/26195" }
+  stand: 2026-10-04
+
+- id: LU-LUZERN-schnittlage
+  titel: Lage der Schnitte in den Grundrissen angegeben
+  scope: { kanton: LU, gemeinde: Luzern }
+  when: { "in": [{ var: vorhabenstyp }, ["neubau_efh_mfh", "umbau_anbau"]] }
+  requires:
+    typ: merkmal
+    merkmal: schnittlage_in_grundrissen
+  check: manuell
+  schwere: hinweis
+  quelle: { erlass: "Merkblatt Einreichung Baugesuche Stadt Luzern (Version 1.1, 3. Juni 2025)", paragraph: "Plandarstellung", url: "https://www.stadtluzern.ch/dokumentebilder/publikationen/26195" }
+  stand: 2026-10-04
+
+# Das Merkblatt verlangt Originalunterschriften auch auf den Plänen (inkl. Originalsituation), bei juristischen Personen mit Firmenstempel.
+- id: LU-LUZERN-unterschriften-plaene
+  titel: Baugesuchsformular und Pläne von Bauherrschaft, Planenden und Grundeigentümerschaft unterzeichnet (juristische Personen mit Firmenstempel)
+  scope: { kanton: LU, gemeinde: Luzern }
+  when: true
+  requires:
+    typ: merkmal
+    merkmal: plaene_unterzeichnet
+  check: manuell
+  schwere: fehlt_blockierend
+  quelle: { erlass: "Merkblatt Einreichung Baugesuche Stadt Luzern (Version 1.1, 3. Juni 2025)", paragraph: "Unterschriften", url: "https://www.stadtluzern.ch/dokumentebilder/publikationen/26195" }
+  stand: 2026-10-04
+
+# Baugespann ist keine Beilage, sondern Voraussetzung der Publikation; im Dossier nur durch Angabe der Bauherrschaft belegbar.
+- id: LU-LUZERN-baugespann
+  titel: Baugespann erstellt (Neubauten, Volumenveränderungen durch An- und Aufbauten)
+  scope: { kanton: LU, gemeinde: Luzern }
+  when: { "in": [{ var: vorhabenstyp }, ["neubau_efh_mfh", "umbau_anbau"]] }
+  requires:
+    typ: merkmal
+    merkmal: baugespann_erstellt
+  check: manuell
+  schwere: hinweis
+  quelle: { erlass: "Merkblatt Einreichung Baugesuche Stadt Luzern (Version 1.1, 3. Juni 2025)", paragraph: "Baugespann", url: "https://www.stadtluzern.ch/dokumentebilder/publikationen/26195" }
+  stand: 2026-10-04

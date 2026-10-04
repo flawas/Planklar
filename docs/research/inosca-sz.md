@@ -11,7 +11,7 @@ Recherche zu Issue #49. Stand der Prüfung: 2026-10-04, Repository `github.com/i
 
 ## Fundorte
 
-| Pfad (unter `django/kt_schwyz/`) | Inhalt | Nutzen für Planklar |
+| Pfad (unter `django/kt_schwyz/`) | Inhalt | Nutzen für Liquet |
 | --- | --- | --- |
 | `form.json` (ca. 600 KB) | Schlüssel `forms` (80 Formularversionen), `modules` (82), `questions` (699) | Hauptquelle: Fragen, Pflichtangaben, Sichtbarkeitsbedingungen |
 | `config/caluma_form.json` | Django-Fixture (`caluma_form.form/question/option/...`), 13 Formulare | Nur Verwaltungsformulare der Behörde (Bauverwaltung, Voranfrage); für Gesuchsteller nicht relevant |
@@ -37,7 +37,7 @@ Recherche zu Issue #49. Stand der Prüfung: 2026-10-04, Repository `github.com/i
 - Kantonale Gesamtdefinition: kein Gemeindebezug. Die Schwyzer Gemeinden sind nicht als eigene Formularvarianten modelliert; gemeindespezifische Beilagen (Baureglemente) sind darin **nicht** enthalten.
 - Keine Rechtsquellen: Weder Erlass noch Paragraph sind je Frage hinterlegt (nur Freitext in `label`/`hint`).
 
-## Eignung für Planklar
+## Eignung für Liquet
 
 Passend:
 - Vollständige, aktuelle Liste der Gesuchstypen und Fachthemen als Gliederungshilfe für Vorhabentypen (`rules/SZ`).

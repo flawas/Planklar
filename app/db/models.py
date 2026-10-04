@@ -15,12 +15,15 @@ from sqlalchemy import (
     Integer,
     String,
     UniqueConstraint,
+    event,
     false,
     func,
+    select,
     text,
     true,
 )
 from sqlalchemy.dialects.postgresql import JSONB
+from sqlalchemy.engine import Connection
 from sqlalchemy.orm import Mapped, mapped_column, relationship, synonym
 
 from app.db.base import Base
@@ -142,6 +145,7 @@ class Dokument(Base):
     __table_args__ = (UniqueConstraint("dossier_id", "sha256"),)
 
     id: Mapped[uuid.UUID] = mapped_column(primary_key=True, default=uuid.uuid4)
+    buero_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("buero.id"), index=True)
     dossier_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("dossier.id"), index=True)
     dateiname: Mapped[str] = mapped_column(String(500))
     sha256: Mapped[str] = mapped_column(String(64))
@@ -160,6 +164,7 @@ class Seite(Base):
     __table_args__ = (UniqueConstraint("dokument_id", "nummer"),)
 
     id: Mapped[uuid.UUID] = mapped_column(primary_key=True, default=uuid.uuid4)
+    buero_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("buero.id"), index=True)
     dokument_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("dokument.id"), index=True)
     nummer: Mapped[int] = mapped_column(Integer)
     plantyp: Mapped[str | None] = mapped_column(String(100))
@@ -219,6 +224,7 @@ class Pruefung(Base):
     __tablename__ = "pruefung"
 
     id: Mapped[uuid.UUID] = mapped_column(primary_key=True, default=uuid.uuid4)
+    buero_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("buero.id"), index=True)
     dossier_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("dossier.id"), index=True)
     regelset_hash: Mapped[str] = mapped_column(String(64))
     modellversion: Mapped[str] = mapped_column(String(200))
@@ -253,6 +259,7 @@ class Befund(Base):
     )
 
     id: Mapped[uuid.UUID] = mapped_column(primary_key=True, default=uuid.uuid4)
+    buero_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("buero.id"), index=True)
     pruefung_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("pruefung.id"), index=True)
     regel_id: Mapped[str] = mapped_column(String(200))
     ergebnis: Mapped[Ergebnis] = mapped_column(_enum(Ergebnis, "ergebnis"))
@@ -281,3 +288,27 @@ class KiEinstellung(Base):
     updated_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), onupdate=func.now()
     )
+
+
+# Denormalisiertes `buero_id` (Voraussetzung für RLS): wird beim Einfügen vom Elternobjekt
+# übernommen, falls nicht gesetzt (z. B. bei Anlage über Relationships). `BueroScope` setzt es
+# ausdrücklich.
+_ELTERN: dict[type[Base], tuple[str, type[Base]]] = {
+    Dokument: ("dossier_id", Dossier),
+    Seite: ("dokument_id", Dokument),
+    Pruefung: ("dossier_id", Dossier),
+    Befund: ("pruefung_id", Pruefung),
+}
+
+
+def _buero_id_uebernehmen(mapper: Any, connection: Connection, target: Any) -> None:
+    if target.buero_id is not None:
+        return
+    fk, eltern = _ELTERN[type(target)]
+    target.buero_id = connection.scalar(
+        select(eltern.buero_id).where(eltern.id == getattr(target, fk))  # type: ignore[attr-defined]
+    )
+
+
+for _modell in _ELTERN:
+    event.listen(_modell, "before_insert", _buero_id_uebernehmen)

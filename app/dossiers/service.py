@@ -85,6 +85,7 @@ def upload_dokument(
     key = storage.put(dossier.buero_id, dossier.id, sha256, data)
     dokument = Dokument(
         dossier_id=dossier.id,
+        buero_id=dossier.buero_id,
         dateiname=dateiname[:500],
         sha256=sha256,
         seitenzahl=pages,

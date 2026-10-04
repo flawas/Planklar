@@ -30,3 +30,13 @@ def storage() -> Iterator[Storage]:
         app.dependency_overrides[get_storage] = lambda: store
         yield store
         app.dependency_overrides.pop(get_storage, None)
+
+
+@pytest.fixture
+def enqueued(monkeypatch: pytest.MonkeyPatch) -> list[tuple[str, str]]:
+    calls: list[tuple[str, str]] = []
+    monkeypatch.setattr(
+        "app.dossiers.router.run_pruefung_task.delay",
+        lambda buero_id, pruefung_id: calls.append((buero_id, pruefung_id)),
+    )
+    return calls

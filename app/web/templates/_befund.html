@@ -1,0 +1,73 @@
+{# Eine Anforderung im Bericht; wird von Web-Ansicht, HTMX-Teil-Update und PDF geteilt. #}
+<article class="befund ampel-{{ z.ergebnis.name | lower }}" id="befund-{{ z.befund_id }}">
+  <h3>
+    <span class="ampel ampel-{{ z.ergebnis.name | lower }}"><span aria-hidden="true">{{ z.symbol }}</span> {{ z.text }}</span>
+    {{ z.titel }}
+  </h3>
+  <p class="quelle">
+    {% if z.erlass %}Quelle:
+    {% if z.url and modus != "pdf" %}<a href="{{ z.url }}" rel="noopener noreferrer" target="_blank">{{ z.erlass }} {{ z.paragraph }}</a>{% else %}{{ z.erlass }} {{ z.paragraph }}{% if z.url %} ({{ z.url }}){% endif %}{% endif %}
+    · Stand {{ z.stand }}
+    {% elif not z.katalog_verfuegbar %}Quelle: Regelkatalog nicht verfügbar (Regel {{ z.regel_id }})
+    {% else %}Quelle: Regel {{ z.regel_id }} (nicht mehr im aktuellen Regelkatalog){% endif %}
+  </p>
+  {% if z.belege %}
+  <ul class="belege">
+    {% for b in z.belege %}
+    <li>
+      {% if modus == "pdf" %}
+      Beleg: {{ b.dokument }}, Seite {{ b.nummer }}
+      {% else %}
+      <details>
+        <summary>Beleg: {{ b.dokument }}, Seite {{ b.nummer }}</summary>
+        <img class="vorschau" loading="lazy" src="{{ b.vorschau_url }}" alt="Vorschau von {{ b.dokument }}, Seite {{ b.nummer }}">
+      </details>
+      {% endif %}
+    </li>
+    {% endfor %}
+  </ul>
+  {% elif z.original.value == "fehlt" %}
+  <p class="beleg-leer">Kein belegender Plan gefunden.</p>
+  {% endif %}
+  {% if z.begruendung %}
+  <p class="override">
+    Übersteuert von «{{ z.original_text }}» zu «{{ z.text }}». Begründung: {{ z.begruendung }}
+  </p>
+  {% endif %}
+  {% if modus != "pdf" %}
+  {% if fehler_befund == z.befund_id %}<p class="fehler" role="alert">{{ fehler }}</p>{% endif %}
+  {% set basis = "/dossiers/%s/pruefungen/%s/befunde/%s" | format(dossier.id, pruefung.id, z.befund_id) %}
+  <div class="aktionen">
+    {% if z.original.value == "manuell" and not z.begruendung %}
+    <form method="post" action="{{ basis }}/bestaetigen"
+          hx-post="{{ basis }}/bestaetigen" hx-target="#befund-{{ z.befund_id }}" hx-swap="outerHTML">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+      <button type="submit">Als manuell geprüft abhaken</button>
+    </form>
+    {% endif %}
+    {% if z.begruendung %}
+    <form method="post" action="{{ basis }}/zuruecksetzen"
+          hx-post="{{ basis }}/zuruecksetzen" hx-target="#befund-{{ z.befund_id }}" hx-swap="outerHTML">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+      <button type="submit" class="zweit">Übersteuerung zurücknehmen</button>
+    </form>
+    {% endif %}
+    <details>
+      <summary>Befund übersteuern</summary>
+      <form class="formular" method="post" action="{{ basis }}/override"
+            hx-post="{{ basis }}/override" hx-target="#befund-{{ z.befund_id }}" hx-swap="outerHTML">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+        <label for="erg-{{ z.befund_id }}">Neues Ergebnis</label>
+        <select id="erg-{{ z.befund_id }}" name="ergebnis" required>
+          {% for e, text in ergebnis_optionen %}
+          <option value="{{ e.value }}"{% if e == z.ergebnis %} selected{% endif %}>{{ text }}</option>
+          {% endfor %}
+        </select>
+        <label for="beg-{{ z.befund_id }}">Begründung (Pflicht)</label>
+        <textarea id="beg-{{ z.befund_id }}" name="begruendung" rows="3" maxlength="2000" required></textarea>
+        <button type="submit">Übersteuern</button>
+      </form>
+    </details>
+  </div>
+  {% endif %}
+</article>

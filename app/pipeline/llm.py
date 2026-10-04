@@ -14,6 +14,7 @@ from typing import Any, Protocol
 
 import jsonschema
 
+from app.config import get_settings
 from app.pipeline.llm_config import LLMConfig, load_config
 
 
@@ -84,6 +85,12 @@ class LiteLLMClient:
             config = LLMConfig(self._model, "", "")
         if not config.model:
             raise LLMConfigError("Kein KI-Modell konfiguriert")
+        if config.model == "fake":  # nur E2E-Stack mit synthetischen Dossiers
+            if not get_settings().allow_fake_llm:
+                raise LLMConfigError("LLM_MODEL=fake erfordert ALLOW_FAKE_LLM=true")
+            from app.pipeline import fake_llm
+
+            return fake_llm.complete(schema)
 
         content: list[dict[str, Any]] = [{"type": "text", "text": question}]
         if text is not None:

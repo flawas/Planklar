@@ -316,6 +316,14 @@ class BueroScope:
         self.session.flush()
         return befund
 
+    def clear_override(self, befund_id: uuid.UUID) -> Befund:
+        befund = self.get_befund(befund_id)
+        befund.override_ergebnis = None
+        befund.override_begruendung = None
+        befund.override_am = None
+        self.session.flush()
+        return befund
+
 
 def get_scope(
     user: User = Depends(current_user), session: Session = Depends(get_session)

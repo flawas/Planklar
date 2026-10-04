@@ -8,7 +8,7 @@ from app.auth.oidc import ensure_oidc_disabled
 from app.auth.router import admin_router, auth_router
 from app.config import get_settings
 from app.db.session import get_sessionmaker
-from app.dossiers.router import dossier_router
+from app.dossiers.router import dossier_router, vorschau_router
 from app.logging_setup import configure_logging, install_request_logging
 from app.rules.store import lade_katalog
 from app.storage import Storage
@@ -32,6 +32,7 @@ ensure_oidc_disabled(get_settings())
 app.include_router(auth_router)
 app.include_router(admin_router)
 app.include_router(dossier_router)
+app.include_router(vorschau_router)
 app.include_router(web_router)
 app.mount("/static", StaticFiles(directory=BASE_DIR / "static"), name="static")
 

@@ -1,0 +1,9 @@
+{% extends "base.html" %}
+{% block title %}Prüfbericht{% endblock %}
+{% block content %}
+<p><a href="/dossiers/{{ dossier.id }}/ansicht">← Zurück zum Dossier</a>
+  {% if pruefung.status.value == "abgeschlossen" %}
+  · <a href="/dossiers/{{ dossier.id }}/pruefungen/{{ pruefung.id }}/bericht.pdf">Als PDF herunterladen</a>
+  {% endif %}</p>
+{% include "_bericht.html" %}
+{% endblock %}

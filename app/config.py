@@ -20,6 +20,7 @@ class Settings(BaseSettings):
     max_upload_bytes: int = 100 * 1024 * 1024
     llm_model: str = ""
     llm_api_key: str = ""
+    allow_fake_llm: bool = False
     git_commit: str = "unbekannt"
     retention_days: int = 30
     auth_secret: str = ""

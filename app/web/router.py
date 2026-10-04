@@ -3,7 +3,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Annotated
 
-from fastapi import APIRouter, Depends, File, Form, Request, UploadFile, status
+from fastapi import APIRouter, Depends, File, Form, HTTPException, Request, UploadFile, status
 from fastapi.responses import HTMLResponse, RedirectResponse, Response
 from fastapi.security import OAuth2PasswordRequestForm
 from fastapi.templating import Jinja2Templates
@@ -16,11 +16,14 @@ from app.auth.users import (
     get_user_manager,
 )
 from app.config import get_settings
-from app.db.models import User
+from app.db.models import Ergebnis, User
 from app.db.session import get_session
+from app.dossiers.router import start_pruefung_endpoint
 from app.dossiers.scope import BueroScope, NotFoundError
 from app.dossiers.service import UploadError, basename, get_storage, upload_dokument
 from app.pipeline import llm_config
+from app.reports import bericht as berichte
+from app.reports.pdf import render_pdf
 from app.storage import Storage
 from app.web import csrf, ki_einstellungen, unterlagen, vorhaben
 
@@ -168,6 +171,7 @@ def dossier_seite(
         dokumente=dokumente,
         unterlagen=unterlagen.unterlagen_zeilen(dossier, dokumente),
         ergebnisse=[],
+        letzte_pruefung=next(iter(reversed(scope.list_pruefungen(dossier.id))), None),
     )
 
 
@@ -366,3 +370,203 @@ def ki_verbindung_testen(
         )
     ok, meldung = ki_einstellungen.verbindung_testen()
     return _ki_seite(request, user, session, meldung=meldung, ok=ok)
+
+
+MSG_BEGRUENDUNG = "Bitte geben Sie eine Begründung an."
+MSG_START = {
+    "KEINE_DOKUMENTE": "Bitte laden Sie zuerst Dokumente hoch.",
+    "PRUEFUNG_LAEUFT": "Für dieses Dossier läuft bereits eine Prüfung.",
+    "WORKER_NICHT_ERREICHBAR": "Die Prüfung konnte nicht gestartet werden. Bitte später versuchen.",
+}
+ERGEBNIS_OPTIONEN = [
+    (Ergebnis.ERFUELLT, "Erfüllt"),
+    (Ergebnis.FEHLT, "Fehlt"),
+    (Ergebnis.UNSICHER, "Unsicher"),
+    (Ergebnis.MANUELL, "Manuell prüfen"),
+]
+
+
+def _bericht_kontext(scope: BueroScope, dossier_id: uuid.UUID, pruefung_id: uuid.UUID) -> dict:  # type: ignore[type-arg]
+    pruefung = scope.get_pruefung(pruefung_id)
+    if pruefung.dossier_id != dossier_id:
+        raise NotFoundError
+    bericht = berichte.baue_bericht(scope, pruefung_id)
+    return {
+        "bericht": bericht,
+        "pruefung": bericht.pruefung,
+        "dossier": bericht.dossier,
+        "modus": "web",
+        "ergebnis_optionen": ERGEBNIS_OPTIONEN,
+    }
+
+
+@web_router.post("/dossiers/{dossier_id}/pruefen", response_model=None)
+def pruefung_starten(
+    request: Request,
+    dossier_id: uuid.UUID,
+    user: Annotated[User | None, Depends(_optional_user)],
+    csrf_token: Annotated[str, Form()] = "",
+    session: Session = Depends(get_session),
+) -> Response:
+    if user is None:
+        return RedirectResponse("/login", status.HTTP_303_SEE_OTHER)
+    if not csrf.matches(request.cookies.get(csrf.CSRF_COOKIE), csrf_token):
+        return _render(request, "_fehler.html", user=user, status_code=403, error=MSG_CSRF)
+    scope = BueroScope(session, user.buero_id)
+    try:
+        pruefung = start_pruefung_endpoint(dossier_id, scope)
+    except HTTPException as exc:
+        if exc.status_code == status.HTTP_404_NOT_FOUND:
+            return _render(request, "nicht_gefunden.html", user=user, status_code=404)
+        meldung = MSG_START.get(str(exc.detail), MSG_START["WORKER_NICHT_ERREICHBAR"])
+        return _render(
+            request, "_fehler.html", user=user, status_code=exc.status_code, error=meldung
+        )
+    return RedirectResponse(
+        f"/dossiers/{dossier_id}/pruefungen/{pruefung.id}/bericht", status.HTTP_303_SEE_OTHER
+    )
+
+
+@web_router.get("/dossiers/{dossier_id}/pruefungen/{pruefung_id}/bericht", response_model=None)
+def bericht_seite(
+    request: Request,
+    dossier_id: uuid.UUID,
+    pruefung_id: uuid.UUID,
+    user: Annotated[User | None, Depends(_optional_user)],
+    session: Session = Depends(get_session),
+) -> Response:
+    if user is None:
+        return RedirectResponse("/login", status.HTTP_303_SEE_OTHER)
+    try:
+        kontext = _bericht_kontext(BueroScope(session, user.buero_id), dossier_id, pruefung_id)
+    except NotFoundError:
+        return _render(request, "nicht_gefunden.html", user=user, status_code=404)
+    name = "_bericht.html" if request.headers.get("HX-Request") else "bericht.html"
+    return _render(request, name, user=user, **kontext)
+
+
+@web_router.get("/dossiers/{dossier_id}/pruefungen/{pruefung_id}/bericht.pdf", response_model=None)
+def bericht_pdf(
+    request: Request,
+    dossier_id: uuid.UUID,
+    pruefung_id: uuid.UUID,
+    user: Annotated[User | None, Depends(_optional_user)],
+    session: Session = Depends(get_session),
+) -> Response:
+    if user is None:
+        return RedirectResponse("/login", status.HTTP_303_SEE_OTHER)
+    try:
+        kontext = _bericht_kontext(BueroScope(session, user.buero_id), dossier_id, pruefung_id)
+    except NotFoundError:
+        return _render(request, "nicht_gefunden.html", user=user, status_code=404)
+    if kontext["pruefung"].status.value != "abgeschlossen":
+        return _render(request, "_fehler.html", user=user, status_code=409, error=MSG_PDF)
+    pdf = render_pdf(templates.env, {"user": user, "csrf_token": "", **kontext})
+    return Response(
+        pdf,
+        media_type="application/pdf",
+        headers={"Content-Disposition": f'attachment; filename="pruefbericht-{pruefung_id}.pdf"'},
+    )
+
+
+def _befund_antwort(
+    request: Request,
+    user: User,
+    scope: BueroScope,
+    dossier_id: uuid.UUID,
+    pruefung_id: uuid.UUID,
+    befund_id: uuid.UUID,
+    *,
+    status_code: int = 200,
+    fehler: str | None = None,
+) -> Response:
+    """Teil-Update eines Befunds bei HTMX, sonst Weiterleitung zum Bericht."""
+    ziel = f"/dossiers/{dossier_id}/pruefungen/{pruefung_id}/bericht"
+    if not request.headers.get("HX-Request"):
+        if fehler:
+            return _render(
+                request, "_fehler.html", user=user, status_code=status_code, error=fehler
+            )
+        return RedirectResponse(f"{ziel}#befund-{befund_id}", status.HTTP_303_SEE_OTHER)
+    kontext = _bericht_kontext(scope, dossier_id, pruefung_id)
+    zeile = next(z for z in kontext["bericht"].zeilen if z.befund_id == befund_id)
+    headers = {"HX-Retarget": f"#befund-{befund_id}", "HX-Reswap": "outerHTML"}
+    response = _render(
+        request, "_befund.html", user=user, status_code=status_code, z=zeile,
+        fehler=fehler, fehler_befund=befund_id, **kontext,
+    )  # fmt: skip
+    response.headers.update(headers)
+    return response
+
+
+async def _befund_aktion(
+    request: Request,
+    dossier_id: uuid.UUID,
+    pruefung_id: uuid.UUID,
+    befund_id: uuid.UUID,
+    user: User | None,
+    session: Session,
+    aktion: str,
+) -> Response:
+    if user is None:
+        return _render(request, "_fehler.html", status_code=401, error=MSG_NOT_LOGGED_IN)
+    form = {k: v for k, v in (await request.form()).items() if isinstance(v, str)}
+    if not csrf.matches(request.cookies.get(csrf.CSRF_COOKIE), form.get("csrf_token")):
+        return _render(request, "_fehler.html", user=user, status_code=403, error=MSG_CSRF)
+    scope = BueroScope(session, user.buero_id)
+    try:
+        pruefung = scope.get_pruefung(pruefung_id)
+        befund = scope.get_befund(befund_id)
+        if pruefung.dossier_id != dossier_id or befund.pruefung_id != pruefung.id:
+            raise NotFoundError
+        if aktion == "override":
+            try:
+                ergebnis = Ergebnis(form.get("ergebnis", ""))
+            except ValueError:
+                return _befund_antwort(
+                    request, user, scope, dossier_id, pruefung_id, befund_id,
+                    status_code=422, fehler=MSG_ERGEBNIS,
+                )  # fmt: skip
+            begruendung = form.get("begruendung", "").strip()
+            if not begruendung:
+                return _befund_antwort(
+                    request, user, scope, dossier_id, pruefung_id, befund_id,
+                    status_code=422, fehler=MSG_BEGRUENDUNG,
+                )  # fmt: skip
+            scope.set_override(befund_id, ergebnis, begruendung[:2000])
+        elif aktion == "bestaetigen":
+            if befund.ergebnis != Ergebnis.MANUELL:
+                return _befund_antwort(
+                    request, user, scope, dossier_id, pruefung_id, befund_id,
+                    status_code=409, fehler=MSG_NUR_MANUELL,
+                )  # fmt: skip
+            scope.set_override(befund_id, Ergebnis.ERFUELLT, berichte.MANUELL_BEGRUENDUNG)
+        else:
+            scope.clear_override(befund_id)
+        session.commit()
+        return _befund_antwort(request, user, scope, dossier_id, pruefung_id, befund_id)
+    except NotFoundError:
+        return _render(request, "nicht_gefunden.html", user=user, status_code=404)
+
+
+MSG_ERGEBNIS = "Bitte wählen Sie ein gültiges Ergebnis."
+MSG_NUR_MANUELL = "Nur manuell zu prüfende Befunde lassen sich abhaken."
+MSG_PDF = "Der PDF-Export ist erst nach abgeschlossener Prüfung möglich."
+
+
+@web_router.post(
+    "/dossiers/{dossier_id}/pruefungen/{pruefung_id}/befunde/{befund_id}/{aktion}",
+    response_model=None,
+)
+async def befund_aktion(
+    request: Request,
+    dossier_id: uuid.UUID,
+    pruefung_id: uuid.UUID,
+    befund_id: uuid.UUID,
+    aktion: str,
+    user: Annotated[User | None, Depends(_optional_user)],
+    session: Session = Depends(get_session),
+) -> Response:
+    if aktion not in {"override", "bestaetigen", "zuruecksetzen"}:
+        return _render(request, "nicht_gefunden.html", user=user, status_code=404)
+    return await _befund_aktion(request, dossier_id, pruefung_id, befund_id, user, session, aktion)

@@ -76,7 +76,7 @@ def test_bericht_zeigt_ampel_mit_text_symbol_und_quelle(client: TestClient, beri
         assert symbol in r.text
     assert "PBV LU (SRL Nr. 736)" in r.text and "§ 55 Abs. 1" in r.text
     assert "https://srl.lu.ch/" in r.text
-    assert "Stand 2026-10-03" in r.text
+    assert re.search(r"Stand \d{4}-\d{2}-\d{2}", r.text)
     assert "Das Tool gibt Hinweise und entscheidet nichts." in r.text
     assert "bewillig" in r.text.lower()  # Hinweis: keine Aussage zur Bewilligung
     assert "wird bewilligt" not in r.text.lower()

@@ -12,7 +12,7 @@ import uuid
 
 from app.config import get_settings
 from app.db import models as db
-from app.dossiers.scope import BueroScope
+from app.dossiers.scope import BueroScope, NotFoundError
 from app.pipeline.preprocess import open_pdf
 from app.storage import Storage
 
@@ -66,5 +66,7 @@ def render_seite(scope: BueroScope, storage: Storage, seite: db.Seite) -> bytes:
     dokument = scope.get_dokument(seite.dokument_id)
     data = storage.get(scope.buero_id, dokument.dossier_id, dokument.sha256)
     with open_pdf(data) as doc:
+        if not 1 <= seite.nummer <= len(doc):
+            raise NotFoundError("Seite nicht im PDF")
         png: bytes = doc[seite.nummer - 1].get_pixmap(dpi=VORSCHAU_DPI, alpha=False).tobytes("png")
     return png

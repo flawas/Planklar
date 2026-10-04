@@ -70,3 +70,13 @@ def test_fremdbuero_abgewiesen(client: TestClient, db: Session, storage: Storage
     assert client.get(url).status_code == 404  # Token eines anderen Büros
     fremd = vorschau.url_fuer(seite.dokument.dossier.buero_id, seite.id)
     assert client.get(fremd).status_code == 404
+
+
+def test_seitenzahl_ausserhalb_des_pdf_gibt_404(
+    client: TestClient, db: Session, storage: Storage
+) -> None:
+    did, seite = _mit_seite(client, db)
+    seite.nummer = 999
+    db.commit()
+    url = client.get(f"/dossiers/{did}/seiten/{seite.id}/vorschau-url").json()["url"]
+    assert client.get(url).status_code == 404

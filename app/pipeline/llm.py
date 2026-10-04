@@ -75,6 +75,8 @@ class LiteLLMClient:
         if not settings.llm_model:
             raise LLMConfigError("LLM_MODEL ist nicht gesetzt")
         if settings.llm_model == "fake":  # nur E2E-Stack mit synthetischen Dossiers
+            if not settings.allow_fake_llm:
+                raise LLMConfigError("LLM_MODEL=fake erfordert ALLOW_FAKE_LLM=true")
             from app.pipeline import fake_llm
 
             return fake_llm.complete(schema)

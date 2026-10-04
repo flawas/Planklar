@@ -84,7 +84,8 @@ def test_bericht_zeigt_ampel_mit_text_symbol_und_quelle(client: TestClient, beri
 def test_bericht_sortiert_kritisches_zuerst(client: TestClient, bericht) -> None:  # type: ignore[no-untyped-def]
     _, dossier, pruefung, _, _ = bericht
     html = client.get(url(dossier, pruefung)).text
-    assert html.index(FEHLT) < html.index(MANUELL) if FEHLT in html else True
+    assert FEHLT in html and MANUELL in html
+    assert html.index(FEHLT) < html.index(MANUELL)
     assert html.index("ampel-fehlt") < html.index("ampel-erfuellt")
 
 

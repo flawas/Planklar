@@ -3,6 +3,7 @@
 x-e2e: &e2e
   environment:
     LLM_MODEL: fake
+    ALLOW_FAKE_LLM: "true"
     LLM_API_KEY: ""
     AUTH_COOKIE_SECURE: "false"
 

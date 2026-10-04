@@ -129,11 +129,25 @@ def test_fake_modell_liefert_schemakonforme_antworten(monkeypatch: pytest.Monkey
     from app.pipeline.merkmale import schema_fuer
 
     monkeypatch.setenv("LLM_MODEL", "fake")
+    monkeypatch.setenv("ALLOW_FAKE_LLM", "true")
     get_settings.cache_clear()
     try:
         klass = ask("Frage", VISION_SCHEMA, image=b"png")
         assert klass.data["plantyp"] == "Sonstiges" and klass.model == "fake"
         merkmal = ask("Frage", schema_fuer("massstab"), image=b"png")
         assert merkmal.data["vorhanden"] == "ja"
+    finally:
+        get_settings.cache_clear()
+
+
+def test_fake_modell_ohne_opt_in_wird_abgelehnt(monkeypatch: pytest.MonkeyPatch) -> None:
+    from app.config import get_settings
+
+    monkeypatch.setenv("LLM_MODEL", "fake")
+    monkeypatch.delenv("ALLOW_FAKE_LLM", raising=False)
+    get_settings.cache_clear()
+    try:
+        with pytest.raises(llm.LLMConfigError):
+            ask("Frage", SCHEMA, text="x", client=llm.LiteLLMClient())
     finally:
         get_settings.cache_clear()

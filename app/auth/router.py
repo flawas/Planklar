@@ -4,6 +4,7 @@ from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Response
 from fastapi_users import exceptions
 from sqlalchemy.orm import Session
 
+from app import audit
 from app.auth import einladung as svc
 from app.auth import verwaltung
 from app.auth.schemas import (
@@ -57,7 +58,23 @@ async def change_password(
         await manager.validate_password(payload.new_password, user)
     except exceptions.InvalidPasswordException:
         raise HTTPException(status.HTTP_400_BAD_REQUEST, "INVALID_PASSWORD") from None
-    await manager.user_db.update(user, {"hashed_password": hash_password(payload.new_password)})
+    # Neue Session-Version: alle bisherigen Sitzungen (auch diese) enden, neu anmelden
+    await manager.user_db.update(
+        user,
+        {
+            "hashed_password": hash_password(payload.new_password),
+            "session_version": user.session_version + 1,
+        },
+    )
+    audit.protokolliere(
+        manager.user_db.session,
+        audit.PASSWORT_GEAENDERT,
+        buero_id=user.buero_id,
+        user_id=user.id,
+        objekt_typ="user",
+        objekt_id=user.id,
+    )
+    manager.user_db.session.commit()
 
 
 admin_router = APIRouter(prefix="/admin", tags=["admin"])
@@ -72,7 +89,17 @@ async def create_user(
     """Legt einen normalen Benutzer im Büro des Admins an (Mandantentrennung)."""
     data = UserCreate(email=payload.email, password=payload.password, buero_id=admin.buero_id)
     try:
-        return await manager.create(data, safe=True)
+        user = await manager.create(data, safe=True)
+        audit.protokolliere(
+            manager.user_db.session,
+            audit.USER_ANGELEGT,
+            buero_id=admin.buero_id,
+            user_id=admin.id,
+            objekt_typ="user",
+            objekt_id=user.id,
+        )
+        manager.user_db.session.commit()
+        return user
     except exceptions.UserAlreadyExists:
         raise HTTPException(status.HTTP_409_CONFLICT, "USER_ALREADY_EXISTS") from None
     except exceptions.InvalidPasswordException:
@@ -187,7 +214,12 @@ def update_user(
 ) -> User:
     try:
         return verwaltung.update_user(
-            session, admin.buero_id, user_id, rolle=payload.rolle, is_active=payload.is_active
+            session,
+            admin.buero_id,
+            user_id,
+            admin.id,
+            rolle=payload.rolle,
+            is_active=payload.is_active,
         )
     except verwaltung.UserNotFoundError:
         raise HTTPException(status.HTTP_404_NOT_FOUND, "Nicht gefunden") from None
@@ -202,7 +234,7 @@ def delete_user(
     session: Session = Depends(get_session),
 ) -> None:
     try:
-        verwaltung.delete_user(session, admin.buero_id, user_id)
+        verwaltung.delete_user(session, admin.buero_id, user_id, admin.id)
     except verwaltung.UserNotFoundError:
         raise HTTPException(status.HTTP_404_NOT_FOUND, "Nicht gefunden") from None
     except verwaltung.LastAdminError:

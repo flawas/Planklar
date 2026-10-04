@@ -84,7 +84,7 @@ Migration 0011 aktiviert RLS auf `dossier`, `dokument`, `seite`, `pruefung`, `be
 
 ## Büro-Offboarding (Vertragsende)
 
-Löscht ein Büro unwiderruflich samt Dossiers (inkl. Dokumente, Seiten, Prüfläufe, Befunde), S3-Objekten und Benutzern (revDSG). Andere Büros bleiben unberührt.
+Löscht ein Büro unwiderruflich samt Dossiers (inkl. Dokumente, Seiten, Prüfläufe, Befunde), S3-Objekten (gesamtes Präfix `buero/<buero_id>/`, auch verwaiste Objekte), Einladungen und Benutzern (revDSG). Andere Büros bleiben unberührt.
 
 1. Büro-ID ermitteln (z. B. im Plattform-Bereich oder `SELECT id, name FROM buero;`) und Vertragsende bzw. Auftrag schriftlich festhalten. Optional vorher ein Backup ziehen (siehe Backup); danach gelöschte Daten verbleiben dort bis zum Ablauf der Backup-Aufbewahrung.
 2. Büro sperren (`aktiv=false`), damit niemand mehr arbeitet.

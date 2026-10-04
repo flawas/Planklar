@@ -34,6 +34,7 @@ class OffboardingReport:
     dokumente: int = 0
     benutzer: int = 0
     fehlgeschlagen: list[uuid.UUID] = field(default_factory=list)
+    praefix_fehlgeschlagen: bool = False
 
 
 def loesche_buero(session: Session, storage: Storage, buero_id: uuid.UUID) -> OffboardingReport:
@@ -72,6 +73,13 @@ def loesche_buero(session: Session, storage: Storage, buero_id: uuid.UUID) -> Of
     if report.fehlgeschlagen:
         return report
 
+    # Verwaiste Objekte (ohne Dokument-Zeile) gehören ebenfalls zum Büro-Präfix.
+    try:
+        storage.delete_buero_prefix(buero_id)
+    except Exception:  # noqa: BLE001 - Büro bleibt bestehen, Wiederholung räumt nach
+        report.praefix_fehlgeschlagen = True
+        return report
+
     report.benutzer = len(benutzer)
     session.execute(delete(Einladung).where(Einladung.buero_id == buero_id))
     session.execute(delete(User).where(User.buero_id == buero_id))
@@ -107,6 +115,9 @@ def main(argv: list[str] | None = None) -> int:
     )
     if report.fehlgeschlagen:
         print(f"Fehlgeschlagen (erneut ausführen): {len(report.fehlgeschlagen)} Dossiers")
+        return 1
+    if report.praefix_fehlgeschlagen:
+        print("Fehlgeschlagen (erneut ausführen): Büro-Präfix im Speicher", file=sys.stderr)
         return 1
     return 0
 

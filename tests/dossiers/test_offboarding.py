@@ -25,7 +25,7 @@ from app.dossiers.offboarding import (
     main,
 )
 from app.dossiers.scope import BueroScope
-from app.storage import Storage
+from app.storage import ObjectNotFoundError, Storage
 from tests.dossiers.conftest import make_pdf
 
 SHA = "b" * 64
@@ -92,6 +92,20 @@ def test_loescht_buero_und_laesst_anderes_unberuehrt(session: Session, storage: 
     assert session.scalar(select(func.count()).select_from(Befund)) == 1
     assert _vorhanden(storage, b, db_)
     assert da_id != db_.id
+
+
+def test_verwaiste_objekte_im_praefix_werden_geloescht(session: Session, storage: Storage) -> None:
+    a, da = _buero(session, storage, "a")
+    b, db_ = _buero(session, storage, "b")
+    verwaist = "c" * 64
+    storage.put(a.id, da.id, verwaist, make_pdf())
+    a_id = a.id
+
+    loesche_buero(session, storage, a_id)
+
+    with pytest.raises(ObjectNotFoundError):
+        storage.get(a_id, da.id, verwaist)
+    assert _vorhanden(storage, b, db_)
 
 
 def test_unbekanntes_buero(session: Session, storage: Storage) -> None:

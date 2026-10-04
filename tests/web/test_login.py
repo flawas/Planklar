@@ -74,7 +74,7 @@ def test_login_ohne_csrf_token_abgelehnt(client: TestClient, db: Session) -> Non
     r = do_login(client, "a@buero-a.ch", token="")
     assert r.status_code == 403
     assert "abgelaufen" in r.text
-    assert "set-cookie" not in r.headers or "planklar_session" not in r.headers["set-cookie"]
+    assert "set-cookie" not in r.headers or "liquet_session" not in r.headers["set-cookie"]
 
 
 def test_login_mit_gefaelschtem_csrf_token_abgelehnt(client: TestClient, db: Session) -> None:

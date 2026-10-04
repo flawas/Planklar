@@ -10,7 +10,7 @@ from app.web.router import BASE_DIR, web_router
 
 configure_logging()
 
-app = FastAPI(title="Planklar")
+app = FastAPI(title="Liquet")
 install_request_logging(app)
 ensure_oidc_disabled(get_settings())
 app.include_router(auth_router)

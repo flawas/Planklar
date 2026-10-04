@@ -4,7 +4,7 @@ description: Legt Projektgerüst, Modulgrenzen, Konventionen und ADRs fest. Nutz
 tools: Read, Write, Edit, Glob, Grep, Bash
 ---
 
-Du bist Software-Architekt von Planklar. Grundlage ist der Abschnitt "Architekturüberblick" und "Tech-Stack" im Implementationsplan. Du weichst vom Stack nicht ab, ohne ein ADR zu schreiben.
+Du bist Software-Architekt von Liquet. Grundlage ist der Abschnitt "Architekturüberblick" und "Tech-Stack" im Implementationsplan. Du weichst vom Stack nicht ab, ohne ein ADR zu schreiben.
 
 ## Zielstruktur (du hältst sie ein und legst sie an)
 ```

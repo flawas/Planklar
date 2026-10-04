@@ -11,7 +11,7 @@ from typing import Any
 from fastapi import FastAPI, Request, Response
 from fastapi.responses import JSONResponse
 
-LOGGER_NAME = "planklar"
+LOGGER_NAME = "liquet"
 _CODE = re.compile(r"^[A-Za-z0-9_.:-]{1,64}$")
 _CODE_KEY = re.compile(r"^(?:id|code|[a-z0-9_]+_(?:id|code))$")
 

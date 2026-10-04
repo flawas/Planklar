@@ -13,7 +13,7 @@ def _records(caplog: pytest.LogCaptureFixture) -> list[dict]:
     from app.logging_setup import JsonFormatter
 
     fmt = JsonFormatter()
-    return [json.loads(fmt.format(r)) for r in caplog.records if r.name == "planklar"]
+    return [json.loads(fmt.format(r)) for r in caplog.records if r.name == "liquet"]
 
 
 @pytest.fixture
@@ -35,13 +35,13 @@ def client() -> TestClient:
 @pytest.fixture(autouse=True)
 def _propagate() -> None:
     configure_logging()
-    logging.getLogger("planklar").propagate = True
+    logging.getLogger("liquet").propagate = True
 
 
 def test_request_logged_with_id_duration(
     client: TestClient, caplog: pytest.LogCaptureFixture
 ) -> None:
-    caplog.set_level(logging.INFO, logger="planklar")
+    caplog.set_level(logging.INFO, logger="liquet")
     response = client.get("/ok")
     rec = _records(caplog)[-1]
     assert rec["event"] == "request"
@@ -52,7 +52,7 @@ def test_request_logged_with_id_duration(
 
 
 def test_error_code_logged(client: TestClient, caplog: pytest.LogCaptureFixture) -> None:
-    caplog.set_level(logging.INFO, logger="planklar")
+    caplog.set_level(logging.INFO, logger="liquet")
     client.get("/missing")
     assert _records(caplog)[-1]["error_code"] == "http_404"
 
@@ -72,7 +72,7 @@ def test_log_event_rejects_free_text() -> None:
 
 
 def test_log_event_accepts_ids_and_codes(caplog: pytest.LogCaptureFixture) -> None:
-    caplog.set_level(logging.INFO, logger="planklar")
+    caplog.set_level(logging.INFO, logger="liquet")
     did = uuid.uuid4()
     log_event("done", dossier_id=did, error_code="E_X", pages=3)
     rec = _records(caplog)[-1]
@@ -83,7 +83,7 @@ def test_log_event_accepts_ids_and_codes(caplog: pytest.LogCaptureFixture) -> No
 def test_unhandled_exception_logs_type_not_message(
     client: TestClient, caplog: pytest.LogCaptureFixture
 ) -> None:
-    caplog.set_level(logging.INFO, logger="planklar")
+    caplog.set_level(logging.INFO, logger="liquet")
     response = client.get("/boom")
     assert response.status_code == 500
     rid = response.headers["X-Request-ID"]

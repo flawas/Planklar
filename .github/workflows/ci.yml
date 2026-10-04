@@ -78,7 +78,7 @@ jobs:
       - uses: actions/checkout@v7
       - if: needs.detect.outputs.compose == 'true'
         run: docker compose config -q
-      - run: docker build -t planklar:ci .
+      - run: docker build -t liquet:ci .
 
   smoke:
     needs: detect

@@ -3,7 +3,7 @@ import secrets
 
 from app.auth.users import get_auth_secret
 
-CSRF_COOKIE = "planklar_csrf"
+CSRF_COOKIE = "liquet_csrf"
 
 
 def _sign(nonce: str) -> str:

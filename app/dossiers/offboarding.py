@@ -12,7 +12,7 @@ from dataclasses import dataclass, field
 from sqlalchemy import delete, select
 from sqlalchemy.orm import Session
 
-from app.db.models import Buero, User
+from app.db.models import Buero, Einladung, User
 from app.dossiers.scope import BueroScope
 from app.storage import Storage
 
@@ -40,7 +40,12 @@ def loesche_buero(session: Session, storage: Storage, buero_id: uuid.UUID) -> Of
     """Löscht Dossiers (DB und S3), Benutzer und das Büro. Andere Büros bleiben unberührt.
 
     Scheitert ein Dossier, bleibt das Büro samt Benutzern bestehen (`fehlgeschlagen`);
-    ein erneuter Aufruf räumt den Rest ab.
+    ein erneuter Aufruf räumt den Rest ab. Auch Einladungen (E-Mail-Adressen) werden gelöscht;
+    Passwort-Resets verschwinden per `ON DELETE CASCADE` mit den Benutzern.
+
+    Bewusst ausserhalb von `BueroScope`: Das ist eine Plattform-Operation (CLI) über das
+    Büro selbst. `buero`, `user` und `einladung` haben keine RLS (Migration 0011); die
+    mandantengebundenen Daten (Dossier, Dokument, ...) laufen über `BueroScope`.
     """
     if session.get(Buero, buero_id) is None:
         raise BueroNichtGefundenError
@@ -68,6 +73,7 @@ def loesche_buero(session: Session, storage: Storage, buero_id: uuid.UUID) -> Of
         return report
 
     report.benutzer = len(benutzer)
+    session.execute(delete(Einladung).where(Einladung.buero_id == buero_id))
     session.execute(delete(User).where(User.buero_id == buero_id))
     session.execute(delete(Buero).where(Buero.id == buero_id))
     session.commit()

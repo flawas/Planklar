@@ -1,12 +1,23 @@
 import uuid
 from collections.abc import Iterator
+from datetime import UTC, datetime, timedelta
 
 import pytest
 from sqlalchemy import Engine, func, select
 from sqlalchemy.orm import Session
 
 from app.db.base import Base
-from app.db.models import Befund, Buero, Dokument, Dossier, Ergebnis, Kanton, User, Vorhabenstyp
+from app.db.models import (
+    Befund,
+    Buero,
+    Dokument,
+    Dossier,
+    Einladung,
+    Ergebnis,
+    Kanton,
+    User,
+    Vorhabenstyp,
+)
 from app.dossiers.offboarding import (
     BueroNichtGefundenError,
     PlattformAdminError,
@@ -32,6 +43,14 @@ def _buero(session: Session, storage: Storage, name: str) -> tuple[Buero, Dossie
     session.add(b)
     session.flush()
     session.add(User(buero_id=b.id, email=f"{name}@example.org", hashed_password="x"))
+    session.add(
+        Einladung(
+            buero_id=b.id,
+            email=f"neu-{name}@example.org",
+            token_hash=name * 64,
+            expires_at=datetime.now(UTC) + timedelta(days=7),
+        )
+    )
     scope = BueroScope(session, b.id)
     d = scope.add_dossier(
         kanton=Kanton.LU, gemeinde="Luzern", vorhabenstyp=Vorhabenstyp.UMBAU_ANBAU
@@ -64,6 +83,8 @@ def test_loescht_buero_und_laesst_anderes_unberuehrt(session: Session, storage: 
     assert session.get(Buero, a_id) is None
     assert session.scalar(select(func.count()).select_from(User).where(User.buero_id == a_id)) == 0
     assert not _vorhanden(storage, a, da)
+    assert session.scalar(select(func.count()).select_from(Einladung)) == 1
+    assert session.scalars(select(Einladung.buero_id)).one() == b.id
     assert session.get(Buero, b.id) is not None
     assert session.scalar(select(func.count()).select_from(User)) == 1
     assert session.get(Dossier, db_.id) is not None

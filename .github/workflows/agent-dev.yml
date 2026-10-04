@@ -83,6 +83,14 @@ jobs:
             --max-turns 60
             --allowedTools "Read,Write,Edit,Glob,Grep,Bash"
 
+      - name: CI und Review anstossen
+        env:
+          GH_TOKEN: ${{ env.AGENT_PAT }}
+          GH_REPO: ${{ github.repository }}
+        run: |
+          branch=$(git branch --show-current)
+          if [[ "$branch" == agent/* ]]; then bash .github/scripts/ensure-ci.sh "$branch"; fi
+
       - name: Bei Fehlschlag markieren
         if: failure()
         env:

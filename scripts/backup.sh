@@ -11,7 +11,10 @@ POSTGRES_USER="${POSTGRES_USER:-liquet}"
 POSTGRES_DB="${POSTGRES_DB:-liquet}"
 export BACKUP_DIR
 
+# Dumps und Spiegel enthalten Personendaten: nur für den ausführenden Benutzer lesbar.
+umask 077
 mkdir -p "$BACKUP_DIR/db" "$BACKUP_DIR/s3"
+chmod 700 "$BACKUP_DIR" "$BACKUP_DIR/db" "$BACKUP_DIR/s3"
 stamp="$(date +%Y%m%d-%H%M%S)"
 target="$BACKUP_DIR/db/liquet-$stamp.dump"
 

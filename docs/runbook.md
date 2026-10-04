@@ -26,7 +26,7 @@ curl -fsS http://localhost:8080/health
 - einen Datenbank-Dump (`pg_dump -Fc`) in `$BACKUP_DIR/db/liquet-<Zeitstempel>.dump`,
 - einen Spiegel des S3-Buckets in `$BACKUP_DIR/s3` (`aws s3 sync --delete`, über den Compose-Dienst `backup`).
 
-`BACKUP_DIR` muss auf **separatem Speicher** liegen (eigenes Laufwerk, NFS-Mount oder ein Ziel, das ausserhalb des Hosts gesichert wird), sonst schützt das Backup nicht vor Plattenverlust. Dumps älter als `BACKUP_KEEP_DAYS` (Standard 14) werden gelöscht. Der Spiegel enthält Löschungen der Aufbewahrungsfrist (`RETENTION_DAYS`) ebenfalls; Dokumente verschwinden also auch aus dem Backup.
+`BACKUP_DIR` muss auf **separatem Speicher** liegen (eigenes Laufwerk, NFS-Mount oder ein Ziel, das ausserhalb des Hosts gesichert wird), sonst schützt das Backup nicht vor Plattenverlust. Dumps älter als `BACKUP_KEEP_DAYS` (Standard 14) werden gelöscht. Der Spiegel enthält Löschungen der Aufbewahrungsfrist (`RETENTION_DAYS`) ebenfalls; Dokumente verschwinden also auch aus dem Backup. `sync --delete` spiegelt aber auch versehentliche Löschungen oder einen leeren Bucket nach Volume-Verlust; deshalb den Backup-Speicher zusätzlich per Snapshot sichern.
 
 Täglich per Cron (Beispiel, 02:30):
 
@@ -34,7 +34,7 @@ Täglich per Cron (Beispiel, 02:30):
 30 2 * * * cd /opt/liquet && set -a && . ./.env && set +a && scripts/backup.sh >>/var/log/liquet-backup.log 2>&1
 ```
 
-Das Backup enthält Baugesuchsunterlagen und Personendaten: Zugriff auf `BACKUP_DIR` wie auf die Produktionsdaten beschränken.
+Das Backup enthält Baugesuchsunterlagen und Personendaten: Zugriff auf `BACKUP_DIR` wie auf die Produktionsdaten beschränken. Das Skript setzt `umask 077` und `chmod 700` auf `BACKUP_DIR`.
 
 ## Restore
 

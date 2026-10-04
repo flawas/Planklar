@@ -47,6 +47,9 @@ def test_backup_ruft_pg_dump_und_s3_sync(tmp_path: Path) -> None:
     dumps = list((backups / "db").glob("liquet-*.dump"))
     assert len(dumps) == 1
     assert not list((backups / "db").glob("*.part"))
+    assert stat.S_IMODE(dumps[0].stat().st_mode) == 0o600
+    assert stat.S_IMODE(backups.stat().st_mode) == 0o700
+    assert stat.S_IMODE((backups / "db").stat().st_mode) == 0o700
 
 
 def test_restore_ohne_dump_bricht_ab(tmp_path: Path) -> None:

@@ -8,6 +8,7 @@ BACKUP_DIR="${BACKUP_DIR:-./backups}"
 POSTGRES_USER="${POSTGRES_USER:-liquet}"
 POSTGRES_DB="${POSTGRES_DB:-liquet}"
 export BACKUP_DIR
+umask 077
 
 dump="${1:-$(ls -1 "$BACKUP_DIR"/db/liquet-*.dump 2>/dev/null | sort | tail -n 1 || true)}"
 if [ -z "$dump" ] || [ ! -f "$dump" ]; then

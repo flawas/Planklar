@@ -1,13 +1,13 @@
 """Eindeutigkeit: Benutzer-E-Mail ohne Gross-/Kleinschreibung, eine offene Einladung je Adresse
 
-Revision ID: 0013
-Revises: 0012
+Revision ID: 0015
+Revises: 0014
 """
 
 from alembic import op
 
-revision = "0013"
-down_revision = "0012"
+revision = "0015"
+down_revision = "0014"
 branch_labels = None
 depends_on = None
 

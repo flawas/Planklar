@@ -5,9 +5,12 @@ from fastapi_users import exceptions
 from sqlalchemy.orm import Session
 
 from app.auth import einladung as svc
-from app.auth import verwaltung
+from app.auth import plattform, verwaltung
 from app.auth.schemas import (
     AdminUserCreate,
+    BueroCreate,
+    BueroRead,
+    BueroUpdate,
     EinladungCreate,
     EinladungRead,
     PasswordChange,
@@ -26,6 +29,7 @@ from app.auth.users import (
     get_user_manager,
     hash_password,
     require_buero_admin,
+    require_plattform_admin,
 )
 from app.db.models import User
 from app.db.session import get_session
@@ -207,3 +211,50 @@ def delete_user(
         raise HTTPException(status.HTTP_404_NOT_FOUND, "Nicht gefunden") from None
     except verwaltung.LastAdminError:
         raise HTTPException(status.HTTP_409_CONFLICT, "LAST_ADMIN") from None
+
+
+plattform_router = APIRouter(prefix="/plattform", tags=["plattform"])
+
+
+def _buero_antwort(session: Session, buero_id: uuid.UUID) -> plattform.BueroUebersicht:
+    return next(b for b in plattform.liste_bueros(session) if b.id == buero_id)
+
+
+@plattform_router.get("/bueros", response_model=list[BueroRead])
+def list_bueros(
+    _: User = Depends(require_plattform_admin), session: Session = Depends(get_session)
+) -> object:
+    return plattform.liste_bueros(session)
+
+
+@plattform_router.post("/bueros", response_model=BueroRead, status_code=status.HTTP_201_CREATED)
+def create_buero(
+    payload: BueroCreate,
+    background: BackgroundTasks,
+    _: User = Depends(require_plattform_admin),
+    session: Session = Depends(get_session),
+    mailer: Mailer = Depends(get_mailer),
+) -> object:
+    try:
+        buero, mail = plattform.lege_buero_an(session, payload.name, payload.admin_email)
+    except svc.EmailExistiertError:
+        raise HTTPException(status.HTTP_409_CONFLICT, "EMAIL_ALREADY_REGISTERED") from None
+    background.add_task(send_safely, mailer, mail)
+    return _buero_antwort(session, buero.id)
+
+
+@plattform_router.patch("/bueros/{buero_id}", response_model=BueroRead)
+def update_buero(
+    buero_id: uuid.UUID,
+    payload: BueroUpdate,
+    _: User = Depends(require_plattform_admin),
+    session: Session = Depends(get_session),
+) -> object:
+    try:
+        if payload.name is not None:
+            plattform.benenne_um(session, buero_id, payload.name)
+        if payload.aktiv is not None:
+            plattform.setze_aktiv(session, buero_id, payload.aktiv)
+    except plattform.BueroNotFoundError:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "Nicht gefunden") from None
+    return _buero_antwort(session, buero_id)

@@ -28,6 +28,11 @@ Legt das Büro «Liquet» und den Admin an (idempotent, mehrfaches Ausführen is
 > Nur für die lokale Entwicklung. Auf Servern stattdessen eigenes Büro und Passwort setzen:
 > `docker compose exec -e SEED_PASSWORD='…' web python -m app.auth.seed "<Büro>" "<E-Mail>"`
 
+Der Seed dient der Erstinstallation (erstes Büro und Plattform-Admin). Weitere Büros legt der
+Plattform-Admin unter `/plattform` an: Name und E-Mail des ersten Büro-Admins, der per Einladung
+sein Konto einrichtet. Dort lassen sich Büros auch sperren, entsperren und umbenennen; sichtbar
+sind nur Name, Status und Anzahl Benutzer und Dossiers.
+
 ## Nützliche Befehle
 
 ```

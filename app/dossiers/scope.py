@@ -107,6 +107,17 @@ class BueroScope:
             raise NotFoundError
         return seite
 
+    def get_or_add_seite(self, dokument_id: uuid.UUID, nummer: int) -> Seite:
+        """Seite (Dokument, Nummer); wird angelegt, falls noch nicht vorhanden."""
+        self.get_dokument(dokument_id)
+        stmt = select(Seite).where(Seite.dokument_id == dokument_id, Seite.nummer == nummer)
+        seite = self.session.scalars(stmt).one_or_none()
+        if seite is None:
+            seite = Seite(dokument_id=dokument_id, nummer=nummer)
+            self.session.add(seite)
+            self.session.flush()
+        return seite
+
     def update_seite(self, seite_id: uuid.UUID, **fields: Any) -> Seite:
         fields.pop("id", None)
         fields.pop("dokument_id", None)
@@ -145,7 +156,22 @@ class BueroScope:
         self.session.flush()
         return pruefung
 
+    def update_pruefung(self, pruefung_id: uuid.UUID, **fields: Any) -> Pruefung:
+        fields.pop("id", None)
+        fields.pop("dossier_id", None)
+        pruefung = self.get_pruefung(pruefung_id)
+        for key, value in fields.items():
+            setattr(pruefung, key, value)
+        self.session.flush()
+        return pruefung
+
     # Befund
+    def clear_befunde(self, pruefung_id: uuid.UUID) -> None:
+        """Entfernt alle Befunde eines Prüflaufs (Wiederholung desselben Laufs)."""
+        pruefung = self.get_pruefung(pruefung_id)
+        pruefung.befunde.clear()
+        self.session.flush()
+
     def list_befunde(self, pruefung_id: uuid.UUID) -> Sequence[Befund]:
         self.get_pruefung(pruefung_id)
         stmt = select(Befund).where(Befund.pruefung_id == pruefung_id).order_by(Befund.regel_id)

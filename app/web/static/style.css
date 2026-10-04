@@ -147,15 +147,22 @@ details > summary { cursor: pointer; padding: .5rem 0; color: var(--primary); fo
 .meta dt { float: left; clear: left; width: 8rem; font-weight: 500; color: var(--on-surface-variant); }
 .meta dd { margin: 0 0 .15rem 8.5rem; }
 
-/* Startseite: Karten */
-.karten { display: grid; grid-template-columns: repeat(auto-fit, minmax(14rem, 1fr)); gap: 1rem; margin: 1.5rem 0; }
-.karte { display: flex; flex-direction: column; gap: .5rem; padding: 1rem; border-radius: .75rem;
-  background: var(--surface-container); color: var(--on-surface); text-decoration: none;
-  border: 1px solid var(--outline-variant); }
-.karte:hover { background: var(--surface-container-high); box-shadow: var(--elev-1); }
-.karte .icon { color: var(--primary); width: 2rem; height: 2rem; }
-.karte strong { font-weight: 500; font-size: 1.125rem; }
-.karte span { color: var(--on-surface-variant); font-size: .875rem; }
+/* Startseite: Kacheln */
+.untertitel { color: var(--on-surface-variant); margin: -.5rem 0 1.5rem; }
+.kacheln { display: grid; grid-template-columns: repeat(auto-fit, minmax(15rem, 1fr)); gap: 1rem; }
+.kachel { position: relative; display: flex; flex-direction: column; gap: .5rem; min-height: 12rem;
+  padding: 1.5rem; border-radius: 1.75rem; text-decoration: none;
+  background: var(--primary-container); color: var(--on-primary-container);
+  transition: box-shadow .2s, transform .2s; }
+.kachel:hover { box-shadow: var(--elev-1), 0 4px 12px rgb(0 0 0 / .12); transform: translateY(-2px); }
+.kachel-zweit { background: var(--surface-container-high); color: var(--on-surface); }
+.kachel-icon { display: inline-flex; align-items: center; justify-content: center; width: 3.5rem; height: 3.5rem;
+  border-radius: 1rem; background: var(--primary); color: var(--on-primary); margin-bottom: auto; }
+.kachel-icon .icon { width: 2rem; height: 2rem; }
+.kachel strong { font: 500 1.375rem/1.75rem Roboto, sans-serif; }
+.kachel-text { font-size: .875rem; opacity: .85; padding-right: 2rem; }
+.kachel-pfeil { position: absolute; right: 1.25rem; bottom: 1.25rem; }
+@media (prefers-reduced-motion: reduce) { .kachel:hover { transform: none; } }
 
 @media (max-width: 36rem) {
   .abmelden span { display: none; }

@@ -3,10 +3,27 @@
 {% block title %}Start{% endblock %}
 {% block content %}
 <h1>Willkommen</h1>
-<p>Sie sind angemeldet als {{ user.email }}.</p>
-<div class="karten">
-  <a class="karte" href="/vorhaben">{{ icon("folder_open") }}<strong>Meine Vorhaben</strong><span>Bestehende Dossiers und Prüfungen</span></a>
-  <a class="karte" href="/vorhaben/neu">{{ icon("add") }}<strong>Neues Vorhaben erfassen</strong><span>Dossier anlegen und Unterlagen hochladen</span></a>
-  {% if user.is_superuser %}<a class="karte" href="/einstellungen/ki">{{ icon("settings") }}<strong>KI-Einstellungen</strong><span>Anbieter, Modell und Schlüssel</span></a>{% endif %}
+<p class="untertitel">Angemeldet als {{ user.email }}</p>
+<div class="kacheln">
+  <a class="kachel" href="/vorhaben/neu">
+    <span class="kachel-icon">{{ icon("add") }}</span>
+    <strong>Neues Vorhaben</strong>
+    <span class="kachel-text">Dossier anlegen und Unterlagen hochladen</span>
+    <span class="kachel-pfeil">{{ icon("arrow_forward") }}</span>
+  </a>
+  <a class="kachel" href="/vorhaben">
+    <span class="kachel-icon">{{ icon("folder_open") }}</span>
+    <strong>Meine Vorhaben</strong>
+    <span class="kachel-text">Bestehende Dossiers und Prüfberichte</span>
+    <span class="kachel-pfeil">{{ icon("arrow_forward") }}</span>
+  </a>
+  {% if user.is_superuser %}
+  <a class="kachel kachel-zweit" href="/einstellungen/ki">
+    <span class="kachel-icon">{{ icon("settings") }}</span>
+    <strong>KI-Einstellungen</strong>
+    <span class="kachel-text">Anbieter, Modell und Schlüssel</span>
+    <span class="kachel-pfeil">{{ icon("arrow_forward") }}</span>
+  </a>
+  {% endif %}
 </div>
 {% endblock %}

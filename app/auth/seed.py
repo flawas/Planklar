@@ -1,11 +1,15 @@
 """Legt Büro und Admin-Benutzer an: python -m app.auth.seed <Büro> <E-Mail>
 
 Das Passwort wird aus der Umgebungsvariable SEED_PASSWORD gelesen (nie als Argument).
+
+Nur für die lokale Entwicklung: `python -m app.auth.seed --dev` legt (idempotent) den
+Standard-Login admin@liquet.ch / password an. Nie in Produktion verwenden.
 """
 
 import os
 import sys
 
+from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.auth.users import hash_password
@@ -27,7 +31,21 @@ def seed_admin(session: Session, buero_name: str, email: str, password: str) -> 
     return user
 
 
+DEV_BUERO = "Liquet"
+DEV_EMAIL = "admin@liquet.ch"
+DEV_PASSWORD = "password"  # noqa: S105 - bewusst, nur lokale Entwicklung
+
+
 def main() -> None:
+    if sys.argv[1:] == ["--dev"]:
+        with get_sessionmaker()() as session:
+            exists = session.execute(select(User).where(User.email == DEV_EMAIL)).first()
+            if exists:
+                print(f"{DEV_EMAIL} existiert bereits.")
+            else:
+                seed_admin(session, DEV_BUERO, DEV_EMAIL, DEV_PASSWORD)
+                print(f"{DEV_EMAIL} angelegt.")
+        return
     if len(sys.argv) != 3 or not os.environ.get("SEED_PASSWORD"):
         sys.exit("Aufruf: SEED_PASSWORD=... python -m app.auth.seed <Büro> <E-Mail>")
     with get_sessionmaker()() as session:

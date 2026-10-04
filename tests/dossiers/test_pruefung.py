@@ -175,6 +175,23 @@ def test_ausgefallenes_modell_ergibt_nie_erfuellt_fuer_merkmale(
     lauf.run_pruefung(scope, storage, pruefung.id, client=FakeMerkmalClient(fail=True))
     seiten = scope.list_seiten(scope.list_dokumente(dossier.id)[0].id)
     assert all(s.merkmale["_fehler"] == lauf.FEHLER_MERKMALE for s in seiten)
+    assert Ergebnis.ERFUELLT not in _ergebnisse(scope, pruefung.id).values()
+
+
+def test_defekte_feldzuordnung_stoppt_den_lauf_nicht(
+    db: Session, storage: Storage, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    def kaputt(canton: str) -> dict[str, str]:
+        raise ValueError("defekte Feldzuordnung")
+
+    monkeypatch.setattr(lauf, "load_field_map", kaputt)
+    scope, dossier = _dossier(db, storage)
+    pruefung = lauf.start_pruefung(scope, dossier.id)
+    db.commit()
+
+    result = lauf.run_pruefung(scope, storage, pruefung.id, client=FakeMerkmalClient())
+
+    assert result.status is Pruefstatus.ABGESCHLOSSEN
 
 
 def test_fehlende_vorhabensattribute_ergeben_unsicher_statt_weglassen(

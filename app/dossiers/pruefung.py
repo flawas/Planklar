@@ -23,7 +23,7 @@ from app.config import get_settings
 from app.db import models as db
 from app.dossiers.scope import BueroScope
 from app.pipeline.classify import VOTES, classify_page
-from app.pipeline.formfields import extract_normalized_fields
+from app.pipeline.formfields import load_field_map, normalize_fields
 from app.pipeline.llm import LLMClient
 from app.pipeline.merkmale import extract_merkmale, merkmale_fuer
 from app.pipeline.plantyp import Plantyp
@@ -143,9 +143,14 @@ def _verarbeite_dokument(
         log.warning("Dokument nicht lesbar (%s)", type(exc).__name__)
         content = None
     if content is not None:
-        for key, value in extract_normalized_fields(data, canton).values.items():
-            if value and not formularfelder.get(key):
-                formularfelder[key] = value
+        try:
+            normalisiert = normalize_fields(content.form_fields, load_field_map(canton))
+        except Exception as exc:  # defekte Feldzuordnung stoppt den Lauf nicht
+            log.warning("Formularfelder nicht lesbar (%s)", type(exc).__name__)
+        else:
+            for key, value in normalisiert.values.items():
+                if value and not formularfelder.get(key):
+                    formularfelder[key] = value
 
     for nummer in range(1, dokument.seitenzahl + 1):
         seite = scope.get_or_add_seite(dokument.id, nummer)

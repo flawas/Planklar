@@ -82,6 +82,17 @@ Migration 0011 aktiviert RLS auf `dossier`, `dokument`, `seite`, `pruefung`, `be
 3. `REQUIRE_RLS_ROLE=true` (in Compose gesetzt) bricht den Start ab, wenn die App-Rolle Superuser ist oder `BYPASSRLS` hat; sonst warnt das Log mit `DB_ROLE_BYPASSES_RLS`.
 4. Jeder Pfad setzt den Büro-Kontext über `BueroScope` (`app/db/rls.py`). Ohne Kontext liefern Abfragen keine Zeilen, das ist beabsichtigt. Celery-Tasks erhalten `buero_id` als Argument; der Retention-Job setzt den Kontext je Büro.
 
+## Büro-Offboarding (Vertragsende)
+
+Löscht ein Büro unwiderruflich samt Dossiers (inkl. Dokumente, Seiten, Prüfläufe, Befunde), S3-Objekten (gesamtes Präfix `buero/<buero_id>/`, auch verwaiste Objekte), Einladungen und Benutzern (revDSG). Andere Büros bleiben unberührt.
+
+1. Büro-ID ermitteln (z. B. im Plattform-Bereich oder `SELECT id, name FROM buero;`) und Vertragsende bzw. Auftrag schriftlich festhalten. Optional vorher ein Backup ziehen (siehe Backup); danach gelöschte Daten verbleiben dort bis zum Ablauf der Backup-Aufbewahrung.
+2. Büro sperren (`aktiv=false`), damit niemand mehr arbeitet.
+3. Ausführen im `web`-Container: `docker compose exec web python -m app.dossiers.offboarding <buero_id> --bestaetigen`. Ohne `--bestaetigen` passiert nichts (Exit 2).
+4. Die Ausgabe nennt nur Anzahlen (Dossiers, Dokumente, Benutzer). Exit 0 = vollständig gelöscht. Bei Exit 1 mit "Fehlgeschlagen" (z. B. Speicher nicht erreichbar) bleibt das Büro bestehen: Ursache beheben und das Kommando erneut ausführen (idempotent).
+5. Enthält das Büro einen Plattform-Admin, bricht das Kommando ab; diesen Benutzer zuvor in ein anderes Büro verschieben bzw. entfernen.
+6. Kontrolle: `SELECT count(*) FROM buero WHERE id = '<buero_id>';` ergibt 0; im Bucket ist das Präfix `buero/<buero_id>/` leer.
+
 ## Login-Schutz und Audit-Log
 
 - Fehlversuche werden je E-Mail und je IP gezählt (`LOGIN_MAX_FEHLVERSUCHE_EMAIL`=5, `LOGIN_MAX_FEHLVERSUCHE_IP`=20 im Fenster `LOGIN_FENSTER_SEKUNDEN`=900). Danach antwortet der Login mit 429 und `Retry-After`, auch bei richtigem Passwort. Gespeichert werden nur SHA-256-Hashes.

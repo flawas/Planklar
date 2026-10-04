@@ -21,7 +21,9 @@ from pydantic import EmailStr, TypeAdapter, ValidationError
 from sqlalchemy.orm import Session
 
 from app.auth import einladung as einladung_svc
-from app.auth import plattform
+from app.auth import plattform, verwaltung
+from app.auth.router import change_password
+from app.auth.schemas import PasswordChange
 from app.auth.tokens import jetzt
 from app.auth.users import (
     COOKIE_NAME,
@@ -77,6 +79,14 @@ MSG_EINLADUNG_OFFEN = (
     "Senden Sie sie erneut oder widerrufen Sie sie."
 )
 MSG_EINLADUNG_UNBEKANNT = "Einladung nicht gefunden."
+MSG_USER_UNBEKANNT = "Benutzer nicht gefunden."
+MSG_NAME_LANG = "Vor- und Nachname dürfen höchstens 100 Zeichen lang sein."
+MSG_LETZTER_ADMIN = (
+    "Der letzte aktive Administrator des Büros kann nicht geändert oder gelöscht werden."
+)
+MSG_ROLLE = "Ungültige Rolle."
+MSG_PW_ALT = "Das bisherige Passwort ist falsch."
+MSG_PW_KURZ = "Das neue Passwort ist ungültig (mindestens 10 Zeichen)."
 
 
 @dataclass
@@ -880,6 +890,49 @@ async def befund_aktion(
     return await _befund_aktion(request, dossier_id, pruefung_id, befund_id, user, session, aktion)
 
 
+ROLLEN_TEXT = {Rolle.MITARBEITER: "Mitarbeiter", Rolle.BUERO_ADMIN: "Büro-Administrator"}
+
+
+def _benutzer_seite(
+    request: Request,
+    user: User,
+    session: Session,
+    *,
+    meldung: str | None = None,
+    ok: bool = True,
+    pw_fehler: str | None = None,
+    status_code: int = 200,
+) -> Response:
+    return _render(
+        request,
+        "benutzer.html",
+        user=user,
+        status_code=status_code,
+        benutzer=verwaltung.list_users(session, user.buero_id),
+        rollen=ROLLEN_TEXT,
+        meldung=meldung,
+        ok=ok,
+        pw_fehler=pw_fehler,
+    )
+
+
+def _benutzer_pruefen(
+    request: Request, user: User | None, csrf_token: str
+) -> tuple[User | None, Response | None]:
+    """Zugriffsprüfung der Benutzerverwaltung: nur Büro-Administratoren, CSRF bei POST."""
+    if user is None:
+        return None, _render(request, "_fehler.html", status_code=401, error=MSG_NOT_LOGGED_IN)
+    if user.rolle != Rolle.BUERO_ADMIN:
+        return None, _render(
+            request, "_fehler.html", user=user, status_code=403, error=MSG_FORBIDDEN
+        )
+    if csrf_token is not None and not csrf.matches(
+        request.cookies.get(csrf.CSRF_COOKIE), csrf_token
+    ):
+        return None, _render(request, "_fehler.html", user=user, status_code=403, error=MSG_CSRF)
+    return user, None
+
+
 def _einladungen_seite(
     request: Request,
     user: User,
@@ -903,21 +956,21 @@ def _einladungen_seite(
     )
 
 
-def _einladungen_pruefen(
-    request: Request, user: User | None, csrf_token: str
-) -> tuple[User | None, Response | None]:
-    """Zugriffsprüfung der Einladungs-Aktionen (POST): angemeldet, Büro-Admin, CSRF."""
+_einladungen_pruefen = _benutzer_pruefen
+
+
+@web_router.get("/benutzer", response_model=None)
+def benutzer_uebersicht(
+    request: Request,
+    user: Annotated[User | None, Depends(_optional_user)],
+    session: Session = Depends(get_session),
+) -> Response:
     if user is None:
-        return None, _render(request, "_fehler.html", status_code=401, error=MSG_NOT_LOGGED_IN)
-    if user.rolle != Rolle.BUERO_ADMIN:
-        return None, _render(
-            request, "_fehler.html", user=user, status_code=403, error=MSG_FORBIDDEN
-        )
-    if csrf_token is not None and not csrf.matches(
-        request.cookies.get(csrf.CSRF_COOKIE), csrf_token
-    ):
-        return None, _render(request, "_fehler.html", user=user, status_code=403, error=MSG_CSRF)
-    return user, None
+        return RedirectResponse("/login", status.HTTP_303_SEE_OTHER)
+    admin, fehler = _benutzer_pruefen(request, user, None)  # type: ignore[arg-type]
+    if fehler:
+        return fehler
+    return _benutzer_seite(request, user, session)
 
 
 @web_router.get("/einladungen", response_model=None)
@@ -1014,3 +1067,186 @@ def einladung_widerrufen(
             request, admin, session, meldung=MSG_EINLADUNG_UNBEKANNT, ok=False, status_code=404
         )
     return _einladungen_seite(request, admin, session, meldung=MSG_EINLADUNG_WIDERRUFEN)
+    admin, fehler = _benutzer_pruefen(request, user, None)  # type: ignore[arg-type]
+    if fehler:
+        return fehler
+    return _benutzer_seite(request, user, session)
+
+
+def _benutzer_aendern(
+    request: Request,
+    admin: User,
+    session: Session,
+    user_id: uuid.UUID,
+    **felder: Rolle | bool | str,
+) -> Response:
+    try:
+        verwaltung.update_user(session, admin.buero_id, user_id, admin.id, **felder)  # type: ignore[arg-type]
+    except verwaltung.UserNotFoundError:
+        return _benutzer_seite(
+            request, admin, session, meldung=MSG_USER_UNBEKANNT, ok=False, status_code=404
+        )
+    except verwaltung.LastAdminError:
+        return _benutzer_seite(
+            request, admin, session, meldung=MSG_LETZTER_ADMIN, ok=False, status_code=409
+        )
+    return _benutzer_seite(request, admin, session, meldung=MSG_GESPEICHERT)
+
+
+@web_router.post("/benutzer/passwort", response_model=None)
+async def benutzer_passwort(
+    request: Request,
+    user: Annotated[User | None, Depends(_optional_user)],
+    manager: UserManager = Depends(get_user_manager),
+    session: Session = Depends(get_session),
+    csrf_token: Annotated[str, Form()] = "",
+    old_password: Annotated[str, Form()] = "",
+    new_password: Annotated[str, Form()] = "",
+) -> Response:
+    admin, fehler = _benutzer_pruefen(request, user, csrf_token)
+    if fehler or admin is None:
+        return fehler  # type: ignore[return-value]
+    try:
+        await change_password(
+            PasswordChange(old_password=old_password, new_password=new_password), admin, manager
+        )
+    except HTTPException as exc:
+        text = MSG_PW_ALT if exc.detail == "INVALID_OLD_PASSWORD" else MSG_PW_KURZ
+        return _benutzer_seite(request, admin, session, pw_fehler=text, status_code=400)
+    # Alle Sitzungen sind beendet: neu anmelden
+    response = RedirectResponse("/login", status.HTTP_303_SEE_OTHER)
+    response.delete_cookie(COOKIE_NAME)
+    return response
+
+
+@web_router.post("/benutzer/{user_id}/rolle", response_model=None)
+def benutzer_rolle(
+    request: Request,
+    user_id: uuid.UUID,
+    user: Annotated[User | None, Depends(_optional_user)],
+    session: Session = Depends(get_session),
+    csrf_token: Annotated[str, Form()] = "",
+    rolle: Annotated[str, Form()] = "",
+) -> Response:
+    admin, fehler = _benutzer_pruefen(request, user, csrf_token)
+    if fehler or admin is None:
+        return fehler  # type: ignore[return-value]
+    if rolle not in {r.value for r in Rolle}:
+        return _benutzer_seite(
+            request, admin, session, meldung=MSG_ROLLE, ok=False, status_code=400
+        )
+    return _benutzer_aendern(request, admin, session, user_id, rolle=Rolle(rolle))
+
+
+@web_router.post("/benutzer/{user_id}/name", response_model=None)
+def benutzer_name(
+    request: Request,
+    user_id: uuid.UUID,
+    user: Annotated[User | None, Depends(_optional_user)],
+    session: Session = Depends(get_session),
+    csrf_token: Annotated[str, Form()] = "",
+    vorname: Annotated[str, Form()] = "",
+    nachname: Annotated[str, Form()] = "",
+) -> Response:
+    admin, fehler = _benutzer_pruefen(request, user, csrf_token)
+    if fehler or admin is None:
+        return fehler  # type: ignore[return-value]
+    if max(len(vorname.strip()), len(nachname.strip())) > 100:
+        return _benutzer_seite(
+            request, admin, session, meldung=MSG_NAME_LANG, ok=False, status_code=422
+        )
+    return _benutzer_aendern(request, admin, session, user_id, vorname=vorname, nachname=nachname)
+
+
+@web_router.get("/profil", response_model=None)
+def profil_form(
+    request: Request, user: Annotated[User | None, Depends(_optional_user)]
+) -> Response:
+    if user is None:
+        return RedirectResponse("/login", status.HTTP_303_SEE_OTHER)
+    return _render(request, "profil.html", user=user)
+
+
+@web_router.post("/profil", response_model=None)
+def profil_speichern(
+    request: Request,
+    user: Annotated[User | None, Depends(_optional_user)],
+    session: Session = Depends(get_session),
+    csrf_token: Annotated[str, Form()] = "",
+    vorname: Annotated[str, Form()] = "",
+    nachname: Annotated[str, Form()] = "",
+) -> Response:
+    if user is None:
+        return _render(request, "_fehler.html", status_code=401, error=MSG_NOT_LOGGED_IN)
+    if not csrf.matches(request.cookies.get(csrf.CSRF_COOKIE), csrf_token):
+        return _render(request, "_fehler.html", user=user, status_code=403, error=MSG_CSRF)
+    if max(len(vorname.strip()), len(nachname.strip())) > 100:
+        return _render(
+            request, "profil.html", user=user, status_code=422, meldung=MSG_NAME_LANG, ok=False
+        )
+    # Nur der Name: Rolle und Status bleiben unberührt
+    aktualisiert = verwaltung.update_user(
+        session, user.buero_id, user.id, user.id, vorname=vorname, nachname=nachname
+    )
+    return _render(request, "profil.html", user=aktualisiert, meldung=MSG_GESPEICHERT)
+
+
+@web_router.post("/benutzer/{user_id}/status", response_model=None)
+def benutzer_status(
+    request: Request,
+    user_id: uuid.UUID,
+    user: Annotated[User | None, Depends(_optional_user)],
+    session: Session = Depends(get_session),
+    csrf_token: Annotated[str, Form()] = "",
+    aktiv: Annotated[str, Form()] = "",
+) -> Response:
+    admin, fehler = _benutzer_pruefen(request, user, csrf_token)
+    if fehler or admin is None:
+        return fehler  # type: ignore[return-value]
+    return _benutzer_aendern(request, admin, session, user_id, is_active=aktiv == "1")
+
+
+@web_router.get("/benutzer/{user_id}/loeschen", response_model=None)
+def benutzer_loeschen_bestaetigen(
+    request: Request,
+    user_id: uuid.UUID,
+    user: Annotated[User | None, Depends(_optional_user)],
+    session: Session = Depends(get_session),
+) -> Response:
+    if user is None:
+        return RedirectResponse("/login", status.HTTP_303_SEE_OTHER)
+    admin, fehler = _benutzer_pruefen(request, user, None)  # type: ignore[arg-type]
+    if fehler or admin is None:
+        return fehler  # type: ignore[return-value]
+    ziel = next(
+        (u for u in verwaltung.list_users(session, admin.buero_id) if u.id == user_id), None
+    )
+    if ziel is None:
+        return _benutzer_seite(
+            request, admin, session, meldung=MSG_USER_UNBEKANNT, ok=False, status_code=404
+        )
+    return _render(request, "benutzer_loeschen.html", user=admin, ziel=ziel)
+
+
+@web_router.post("/benutzer/{user_id}/loeschen", response_model=None)
+def benutzer_loeschen(
+    request: Request,
+    user_id: uuid.UUID,
+    user: Annotated[User | None, Depends(_optional_user)],
+    session: Session = Depends(get_session),
+    csrf_token: Annotated[str, Form()] = "",
+) -> Response:
+    admin, fehler = _benutzer_pruefen(request, user, csrf_token)
+    if fehler or admin is None:
+        return fehler  # type: ignore[return-value]
+    try:
+        verwaltung.delete_user(session, admin.buero_id, user_id, admin.id)
+    except verwaltung.UserNotFoundError:
+        return _benutzer_seite(
+            request, admin, session, meldung=MSG_USER_UNBEKANNT, ok=False, status_code=404
+        )
+    except verwaltung.LastAdminError:
+        return _benutzer_seite(
+            request, admin, session, meldung=MSG_LETZTER_ADMIN, ok=False, status_code=409
+        )
+    return _benutzer_seite(request, admin, session, meldung="Benutzer gelöscht.")

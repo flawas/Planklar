@@ -146,3 +146,74 @@ def test_abschluss_ohne_verfahren_ergibt_422(client: TestClient, db: Session) ->
     )  # fmt: skip
     assert r.status_code == 422
     assert db.scalars(select(Dossier)).all() == []
+
+
+def _angelegt(client: TestClient, db: Session, tok: str) -> Dossier:
+    post(
+        client,
+        tok,
+        schritt="5",
+        aktion="fertig",
+        kanton="SZ",
+        gemeinde="Küssnacht",
+        vorhabenstyp="neubau_efh_mfh",
+        verfahren="vereinfacht",
+        gewaesserbezug="nein",
+        kantonsstrassenbezug="ja",
+        waldbezug="nein",
+        ausserhalb_bauzone="nein",
+        gebaeudehoehe_m="9,5",
+    )
+    return db.scalars(select(Dossier)).one()
+
+
+def test_bearbeiten_vorbefuellt_und_speichert(client: TestClient, db: Session) -> None:
+    tok = start(client, db)
+    d = _angelegt(client, db, tok)
+    r = client.get(f"/dossiers/{d.id}/bearbeiten")
+    assert r.status_code == 200 and "Vorhaben bearbeiten" in r.text
+    assert re.search(r'value="SZ"\s+checked', r.text)
+    r = post(
+        client,
+        tok,
+        schritt="5",
+        aktion="fertig",
+        dossier_id=str(d.id),
+        kanton="SZ",
+        gemeinde="Freienbach",
+        vorhabenstyp="neubau_efh_mfh",
+        verfahren="ordentlich",
+        gewaesserbezug="ja",
+        kantonsstrassenbezug="ja",
+        waldbezug="nein",
+        ausserhalb_bauzone="nein",
+    )
+    assert r.status_code == 204 and r.headers["HX-Redirect"] == f"/dossiers/{d.id}/ansicht"
+    db.expire_all()
+    assert db.scalars(select(Dossier)).one().gemeinde == "Freienbach"
+    d = db.scalars(select(Dossier)).one()
+    assert d.attribute["gewaesserbezug"] is True and d.attribute["verfahren"] == "ordentlich"
+
+
+def test_bearbeiten_fremdes_dossier_404(client: TestClient, db: Session) -> None:
+    tok = start(client, db)
+    d = _angelegt(client, db, tok)
+    make_user(db, "b@buero-b.ch")
+    do_login(client, "b@buero-b.ch")
+    assert client.get(f"/dossiers/{d.id}/bearbeiten").status_code == 404
+    r = post(
+        client,
+        tok,
+        schritt="5",
+        aktion="fertig",
+        dossier_id=str(d.id),
+        kanton="SZ",
+        gemeinde="Freienbach",
+        vorhabenstyp="neubau_efh_mfh",
+        verfahren="ordentlich",
+        gewaesserbezug="ja",
+        kantonsstrassenbezug="ja",
+        waldbezug="nein",
+        ausserhalb_bauzone="nein",
+    )
+    assert r.status_code == 404

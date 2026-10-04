@@ -35,6 +35,15 @@ class Settings(BaseSettings):
     login_max_fehlversuche_email: int = 5
     login_max_fehlversuche_ip: int = 20
     login_fenster_sekunden: int = 15 * 60
+    # E-Mail-Versand (SMTP, anbieterneutral). Ohne `smtp_host` wird nicht versendet.
+    smtp_host: str = ""
+    smtp_port: int = 587
+    smtp_user: str = ""
+    smtp_password: str = ""
+    smtp_starttls: bool = True
+    mail_from: str = ""
+    # Basis-URL für Links in Mails (Einladung, Passwort-Reset)
+    app_base_url: str = "http://localhost:8000"
     oidc_enabled: bool = False
     oidc_issuer: str = ""
     oidc_client_id: str = ""

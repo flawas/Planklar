@@ -63,6 +63,16 @@ Secrets stehen nur in `.env` bzw. als Docker Secrets auf dem Host, nie im Repo.
 
 Nach jeder Rotation `curl -fsS .../health` prüfen und das nächste Backup kontrollieren.
 
+## E-Mail-Versand (Einladung, Passwort-Reset)
+
+Büro-Admins laden Benutzer per E-Mail ein (`POST /admin/einladungen`); der Passwort-Reset nutzt denselben Token-Mechanismus (`/auth/passwort-reset/anfordern`, `/einloesen`). Versand über SMTP, anbieterneutral, nur per Umgebungsvariablen:
+
+- `SMTP_HOST`, `SMTP_PORT` (587), `SMTP_USER`, `SMTP_PASSWORD`, `SMTP_STARTTLS` (`true`), `MAIL_FROM` (Absender) und `APP_BASE_URL` (Basis der Links in den Mails, z. B. `https://liquet.example.ch`).
+- Ohne `SMTP_HOST` oder `MAIL_FROM` wird nicht versendet; das Log enthält `MAIL_FAILED` mit `code=MAIL_NOT_CONFIGURED`. Der Anbieter ist eine reine Konfigurationsentscheidung (#58/#59/#62).
+- Tokens sind einmalig und nur als SHA-256-Hash gespeichert; Einladungen gelten 7 Tage, Reset-Links 2 Stunden. Weder Tokens noch Mailinhalte oder Adressen stehen im Log, nur Fehlercodes (`MAIL_SEND_FAILED`, `MAIL_NOT_CONFIGURED`).
+- Die Tabellen `einladung` und `passwort_reset` haben bewusst kein RLS: Das Einlösen ist öffentlich und schlägt das Token vor dem Büro-Kontext nach.
+- Tests verwenden `FakeMailer` (`app/mail.py`), nie echtes SMTP.
+
 ## Row-Level Security (Datenbankrollen)
 
 Migration 0011 aktiviert RLS auf `dossier`, `dokument`, `seite`, `pruefung`, `befund` (mit `FORCE`) und legt die Rolle `liquet_app` an (NOBYPASSRLS, NOLOGIN). Superuser und Rollen mit `BYPASSRLS` umgehen RLS immer; die App darf deshalb nicht als `POSTGRES_USER` (Superuser) laufen.

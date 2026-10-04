@@ -296,6 +296,27 @@ def vorhaben_neu(
     return _schritt_antwort(request, user, vorhaben.SchrittView(schritt=1, werte={}))
 
 
+@web_router.get("/dossiers/{dossier_id}/bearbeiten", response_model=None)
+def vorhaben_bearbeiten(
+    request: Request,
+    dossier_id: uuid.UUID,
+    user: Annotated[User | None, Depends(_optional_user)],
+    session: Session = Depends(get_session),
+) -> Response:
+    if user is None:
+        return RedirectResponse("/login", status.HTTP_303_SEE_OTHER)
+    try:
+        dossier = BueroScope(session, user.buero_id).get_dossier(dossier_id)
+    except NotFoundError:
+        return _render(request, "nicht_gefunden.html", user=user, status_code=404)
+    view = vorhaben.SchrittView(
+        schritt=1,
+        werte=vorhaben.werte_aus_dossier(dossier),
+        dossier_id=str(dossier.id),
+    )
+    return _schritt_antwort(request, user, view)
+
+
 @web_router.post("/vorhaben/schritt", response_model=None)
 async def vorhaben_schritt(
     request: Request,
@@ -314,20 +335,39 @@ async def vorhaben_schritt(
     if not 1 <= schritt <= vorhaben.LETZTER_SCHRITT:
         return _render(request, "_fehler.html", user=user, status_code=400, error=MSG_SCHRITT)
     werte = vorhaben.bereinigen(form)
+    dossier_id = ""
+    if form.get("dossier_id"):
+        try:
+            dossier_id = str(uuid.UUID(form["dossier_id"]))
+        except ValueError:
+            return _render(request, "_fehler.html", user=user, status_code=400, error=MSG_SCHRITT)
     aktion = form.get("aktion", "weiter")
     if aktion == "zurueck":
-        return _schritt_antwort(request, user, vorhaben.SchrittView(max(1, schritt - 1), werte))
+        return _schritt_antwort(
+            request, user, vorhaben.SchrittView(max(1, schritt - 1), werte, dossier_id=dossier_id)
+        )
     fehler = vorhaben.pruefe_schritt(schritt, werte)
     if fehler:
-        view = vorhaben.SchrittView(schritt, werte, fehler)
+        view = vorhaben.SchrittView(schritt, werte, fehler, dossier_id=dossier_id)
         return _schritt_antwort(request, user, view, status_code=422)
     if schritt < vorhaben.LETZTER_SCHRITT:
-        return _schritt_antwort(request, user, vorhaben.SchrittView(schritt + 1, werte))
+        return _schritt_antwort(
+            request, user, vorhaben.SchrittView(schritt + 1, werte, dossier_id=dossier_id)
+        )
     neu = vorhaben.zu_dossier(werte)
     if neu is None:
-        view = vorhaben.SchrittView(schritt, werte, meldung=vorhaben.MSG_ALLGEMEIN)
+        view = vorhaben.SchrittView(
+            schritt, werte, meldung=vorhaben.MSG_ALLGEMEIN, dossier_id=dossier_id
+        )
         return _schritt_antwort(request, user, view, status_code=422)
-    dossier = BueroScope(session, user.buero_id).add_dossier(**neu.model_dump())
+    scope = BueroScope(session, user.buero_id)
+    if dossier_id:
+        try:
+            dossier = scope.update_dossier(uuid.UUID(dossier_id), **neu.model_dump())
+        except NotFoundError:
+            return _render(request, "nicht_gefunden.html", user=user, status_code=404)
+    else:
+        dossier = scope.add_dossier(**neu.model_dump())
     session.commit()
     ziel = f"/dossiers/{dossier.id}/ansicht"
     if request.headers.get("HX-Request"):

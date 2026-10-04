@@ -21,3 +21,38 @@
 {% else %}
 <p>Noch keine Dokumente hochgeladen.</p>
 {% endif %}
+<h2>Erwartete Unterlagen</h2>
+<p>Zusammenstellung nach den Regeln für {{ dossier.gemeinde }}. Das ist ein Hinweis, keine Prüfung; das Tool entscheidet nichts.</p>
+{% if unterlagen is none %}
+<p>Für den Kanton {{ dossier.kanton.value }} sind noch keine Regeln hinterlegt.</p>
+{% elif unterlagen %}
+<table class="liste">
+  <caption class="nur-sr">Erwartete Unterlagen mit Quelle</caption>
+  <thead><tr><th scope="col">Unterlage</th><th scope="col">Quelle</th><th scope="col">Hochgeladen</th></tr></thead>
+  <tbody>
+    {% for z in unterlagen %}
+    <tr>
+      <td>
+        {{ z.unterlage.dokument }}
+        {% if z.unterlage.anwendbarkeit.value == "unbekannt" %}
+        <br><small>Je nach Angabe erforderlich (offen: {{ z.unterlage.fehlende_variablen | join(", ") }})</small>
+        {% endif %}
+      </td>
+      <td>
+        {% if z.unterlage.url %}<a href="{{ z.unterlage.url }}" rel="noopener noreferrer" target="_blank">{{ z.unterlage.erlass }} {{ z.unterlage.paragraph }}</a>{% else %}{{ z.unterlage.erlass }} {{ z.unterlage.paragraph }}{% endif %}
+        <br><small>Stand {{ z.unterlage.stand }}</small>
+      </td>
+      <td>
+        {% for name, seiten in z.funde %}
+        {{ name }} (S. {{ seiten | join(", ") }}){% if not loop.last %}<br>{% endif %}
+        {% else %}
+        –
+        {% endfor %}
+      </td>
+    </tr>
+    {% endfor %}
+  </tbody>
+</table>
+{% else %}
+<p>Für dieses Vorhaben sind keine Unterlagen hinterlegt.</p>
+{% endif %}

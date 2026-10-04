@@ -21,7 +21,7 @@ from app.db.session import get_session
 from app.dossiers.scope import BueroScope, NotFoundError
 from app.dossiers.service import UploadError, basename, get_storage, upload_dokument
 from app.storage import Storage
-from app.web import csrf, vorhaben
+from app.web import csrf, unterlagen, vorhaben
 
 BASE_DIR = Path(__file__).parent
 templates = Jinja2Templates(directory=BASE_DIR / "templates")
@@ -157,12 +157,14 @@ def dossier_seite(
         dossier = scope.get_dossier(dossier_id)
     except NotFoundError:
         return _render(request, "nicht_gefunden.html", user=user, status_code=404)
+    dokumente = scope.list_dokumente(dossier.id)
     return _render(
         request,
         "dossier.html",
         user=user,
         dossier=dossier,
-        dokumente=scope.list_dokumente(dossier.id),
+        dokumente=dokumente,
+        unterlagen=unterlagen.unterlagen_zeilen(dossier, dokumente),
         ergebnisse=[],
     )
 
@@ -199,12 +201,14 @@ async def dossier_upload(
             ergebnisse.append(UploadErgebnis(name, True, f"Hochgeladen ({dok.seitenzahl} Seiten)."))
         except UploadError as exc:
             ergebnisse.append(UploadErgebnis(name, False, MSG_UPLOAD[exc.code]))
+    dokumente = scope.list_dokumente(dossier.id)
     return _render(
         request,
         "_dokumente.html",
         user=user,
         dossier=dossier,
-        dokumente=scope.list_dokumente(dossier.id),
+        dokumente=dokumente,
+        unterlagen=unterlagen.unterlagen_zeilen(dossier, dokumente),
         ergebnisse=ergebnisse,
     )
 

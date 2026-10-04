@@ -7,7 +7,7 @@
       enctype="multipart/form-data"
       hx-post="/dossiers/{{ dossier.id }}/upload" hx-encoding="multipart/form-data"
       hx-target="#dokumente" hx-swap="innerHTML"
-      hx-on::xhr:progress="document.getElementById('fortschritt').value = event.detail.loaded / event.detail.total * 100">
+      hx-on::xhr:progress="document.getElementById('fortschritt').value = event.detail.total ? event.detail.loaded / event.detail.total * 100 : 0">
   <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
   <label for="files">PDF-Dateien (mehrere möglich)</label>
   <input id="files" name="files" type="file" accept="application/pdf,.pdf" multiple required>

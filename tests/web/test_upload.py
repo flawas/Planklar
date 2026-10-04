@@ -135,3 +135,10 @@ def test_upload_ohne_dateien(client: TestClient, db: Session, setup) -> None:  #
     assert "<html" not in r.text
     assert "mindestens eine Datei" in r.text
     assert db.scalars(select(Dokument)).all() == []
+
+
+def test_htmx_tauscht_fehlerantworten(client: TestClient, setup) -> None:  # type: ignore[no-untyped-def]
+    _, dossier, _ = setup
+    html = client.get(f"/dossiers/{dossier.id}").text
+    assert 'name="htmx-config"' in html
+    assert '"code":"[45]..","swap":true' in html

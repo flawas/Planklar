@@ -142,7 +142,7 @@ def logout(request: Request, csrf_token: Annotated[str, Form()] = "") -> Respons
     return response
 
 
-@web_router.get("/ui/dossiers/{dossier_id}", response_model=None)
+@web_router.get("/dossiers/{dossier_id}/ansicht", response_model=None)
 def dossier_seite(
     request: Request,
     dossier_id: uuid.UUID,
@@ -166,7 +166,7 @@ def dossier_seite(
     )
 
 
-@web_router.post("/ui/dossiers/{dossier_id}/upload", response_model=None)
+@web_router.post("/dossiers/{dossier_id}/upload", response_model=None)
 async def dossier_upload(
     request: Request,
     dossier_id: uuid.UUID,

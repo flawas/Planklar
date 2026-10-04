@@ -17,7 +17,7 @@ from tests.web.test_login import do_login
 
 
 def token(client: TestClient, dossier: Dossier) -> str:
-    r = client.get(f"/ui/dossiers/{dossier.id}")
+    r = client.get(f"/dossiers/{dossier.id}/ansicht")
     m = re.search(r'name="csrf_token" value="([^"]+)"', r.text)
     assert m
     return m.group(1)
@@ -25,7 +25,7 @@ def token(client: TestClient, dossier: Dossier) -> str:
 
 def up(client: TestClient, dossier: Dossier, files: list[tuple[str, bytes]], tok: str):  # type: ignore[no-untyped-def]
     return client.post(
-        f"/ui/dossiers/{dossier.id}/upload",
+        f"/dossiers/{dossier.id}/upload",
         data={"csrf_token": tok},
         files=[("files", (n, d, "application/pdf")) for n, d in files],
         headers={"HX-Request": "true"},
@@ -42,9 +42,9 @@ def setup(client: TestClient, db: Session, storage: Storage) -> tuple[User, Doss
 
 def test_seite_zeigt_formular_und_leere_liste(client: TestClient, setup) -> None:  # type: ignore[no-untyped-def]
     _, dossier, _ = setup
-    r = client.get(f"/ui/dossiers/{dossier.id}")
+    r = client.get(f"/dossiers/{dossier.id}/ansicht")
     assert r.status_code == 200
-    assert "multiple" in r.text and 'hx-post="/ui/dossiers/' in r.text
+    assert "multiple" in r.text and 'hx-post="/dossiers/' in r.text
     assert "Noch keine Dokumente" in r.text
     assert "Das Tool gibt Hinweise und entscheidet nichts." in r.text
 
@@ -57,7 +57,7 @@ def test_mehrfach_upload_liste_mit_seitenzahl(client: TestClient, db: Session, s
     assert "a.pdf" in r.text and "b.pdf" in r.text
     assert "Hochgeladen (2 Seiten)" in r.text and "Hochgeladen (3 Seiten)" in r.text
     assert len(db.scalars(select(Dokument)).all()) == 2
-    assert "<td>3</td>" in client.get(f"/ui/dossiers/{dossier.id}").text
+    assert "<td>3</td>" in client.get(f"/dossiers/{dossier.id}/ansicht").text
 
 
 def test_fehlerzeile_je_datei_und_doppel(client: TestClient, db: Session, setup) -> None:  # type: ignore[no-untyped-def]
@@ -90,7 +90,7 @@ def test_csrf_pflicht(client: TestClient, db: Session, setup) -> None:  # type: 
 def test_ohne_login(client: TestClient, db: Session, storage: Storage) -> None:  # noqa: F811
     owner = make_user(db, "a@buero-a.ch")
     dossier = make_dossier(db, owner)
-    assert client.get(f"/ui/dossiers/{dossier.id}", follow_redirects=False).status_code == 303
+    assert client.get(f"/dossiers/{dossier.id}/ansicht", follow_redirects=False).status_code == 303
     assert up(client, dossier, [("a.pdf", make_pdf(1))], "x").status_code == 401
 
 
@@ -98,7 +98,7 @@ def test_fremdes_dossier_404(client: TestClient, db: Session, setup) -> None:  #
     other = make_user(db, "b@buero-b.ch")
     fremd = make_dossier(db, other)
     _, _, tok = setup
-    assert client.get(f"/ui/dossiers/{fremd.id}").status_code == 404
+    assert client.get(f"/dossiers/{fremd.id}/ansicht").status_code == 404
     assert up(client, fremd, [("a.pdf", make_pdf(1))], tok).status_code == 404
     assert db.scalars(select(Dokument)).all() == []
 
@@ -129,11 +129,16 @@ def test_verschluesselt(client: TestClient, db: Session, setup) -> None:  # type
 def test_upload_ohne_dateien(client: TestClient, db: Session, setup) -> None:  # type: ignore[no-untyped-def]
     _, dossier, tok = setup
     r = client.post(
-        f"/ui/dossiers/{dossier.id}/upload",
-        data={"csrf_token": tok},
-        headers={"HX-Request": "true"},
+        f"/dossiers/{dossier.id}/upload", data={"csrf_token": tok}, headers={"HX-Request": "true"}
     )
     assert r.status_code == 400
     assert "<html" not in r.text
     assert "mindestens eine Datei" in r.text
     assert db.scalars(select(Dokument)).all() == []
+
+
+def test_htmx_tauscht_fehlerantworten(client: TestClient, setup) -> None:  # type: ignore[no-untyped-def]
+    _, dossier, _ = setup
+    html = client.get(f"/dossiers/{dossier.id}/ansicht").text
+    assert 'name="htmx-config"' in html
+    assert '"code":"[45]..","swap":true' in html

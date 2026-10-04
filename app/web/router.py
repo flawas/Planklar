@@ -25,6 +25,7 @@ from app.auth import plattform
 from app.auth.tokens import jetzt
 from app.auth.users import (
     COOKIE_NAME,
+    LoginGesperrtError,
     UserManager,
     buero_ist_aktiv,
     cookie_backend,
@@ -50,6 +51,7 @@ templates = Jinja2Templates(directory=BASE_DIR / "templates")
 web_router = APIRouter(tags=["web"], include_in_schema=False)
 
 MSG_LOGIN = "E-Mail oder Passwort ist falsch."
+MSG_GESPERRT = "Zu viele Anmeldeversuche. Bitte versuchen Sie es später erneut."
 MSG_CSRF = "Die Sitzung des Formulars ist abgelaufen. Bitte versuchen Sie es erneut."
 MSG_UPLOAD = {
     "FILE_TOO_LARGE": "Die Datei ist zu gross.",
@@ -196,7 +198,14 @@ async def login(
 ) -> Response:
     if not csrf.matches(request.cookies.get(csrf.CSRF_COOKIE), csrf_token):
         return _render(request, "login.html", status_code=403, error=MSG_CSRF, email=email)
-    user = await manager.authenticate(OAuth2PasswordRequestForm(username=email, password=password))
+    try:
+        user = await manager.authenticate(
+            OAuth2PasswordRequestForm(username=email, password=password)
+        )
+    except LoginGesperrtError as e:
+        response = _render(request, "login.html", status_code=429, error=MSG_GESPERRT, email=email)
+        response.headers.update(e.headers or {})
+        return response
     if user is None or not user.is_active:
         return _render(request, "login.html", status_code=400, error=MSG_LOGIN, email=email)
     login_response = await cookie_backend.login(cookie_backend.get_strategy(), user)

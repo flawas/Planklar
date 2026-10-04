@@ -9,9 +9,10 @@ from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
+from app import audit
 from app.auth.tokens import jetzt
 from app.config import Settings
-from app.db.models import Einladung, PasswortReset, Rolle, User
+from app.db.models import AuditEreignis, Einladung, PasswortReset, Rolle, User
 from app.mail import FakeMailer, Mail, MailError, SmtpMailer, get_mailer
 from app.main import app
 from tests.auth.conftest import PASSWORD, make_user
@@ -57,6 +58,20 @@ def test_einladung_einloesen_legt_benutzer_im_buero_an(
     assert user.rolle == Rolle.MITARBEITER
     client.cookies.clear()
     assert login(client, "neu@x.ch", NEU).status_code == 204
+
+
+def test_einladung_schreibt_audit_user_angelegt(
+    client: TestClient, db: Session, mailer: FakeMailer
+) -> None:
+    admin_login(client, db)
+    token = einladen(client, mailer)
+    client.post("/auth/einladung/einloesen", json={"token": token, "password": NEU})
+    user = db.execute(select(User).where(User.email == "neu@x.ch")).scalar_one()
+    ereignis = db.execute(
+        select(AuditEreignis).where(AuditEreignis.aktion == audit.USER_ANGELEGT)
+    ).scalar_one()
+    assert ereignis.objekt_id == user.id
+    assert ereignis.buero_id == user.buero_id
 
 
 def test_token_nur_gehasht_gespeichert(client: TestClient, db: Session, mailer: FakeMailer) -> None:
@@ -202,6 +217,24 @@ def test_reset_ablauf(client: TestClient, db: Session, mailer: FakeMailer) -> No
     assert login(client, "a@a.ch", PASSWORD).status_code == 400
     r = client.post("/auth/passwort-reset/einloesen", json=body)
     assert r.json()["detail"] == "TOKEN_USED"
+
+
+def test_reset_entwertet_sitzungen_und_schreibt_audit(
+    client: TestClient, db: Session, mailer: FakeMailer
+) -> None:
+    user = make_user(db, "a@a.ch")
+    login(client, "a@a.ch")
+    assert client.get("/auth/me").status_code == 200
+    anderer_client = TestClient(app)
+    anderer_client.post("/auth/passwort-reset/anfordern", json={"email": "a@a.ch"})
+    token = token_aus(mailer.outbox[-1])
+    body = {"token": token, "password": NEU}
+    assert anderer_client.post("/auth/passwort-reset/einloesen", json=body).status_code == 204
+    assert client.get("/auth/me").status_code == 401
+    ereignis = db.execute(
+        select(AuditEreignis).where(AuditEreignis.aktion == audit.PASSWORT_GEAENDERT)
+    ).scalar_one()
+    assert ereignis.objekt_id == user.id
 
 
 def test_reset_antwort_verraet_existenz_nicht(

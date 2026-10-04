@@ -209,6 +209,10 @@ class Pruefung(Base):
         DateTime(timezone=True), server_default=func.now()
     )
     beendet_am: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    seiten_gesamt: Mapped[int] = mapped_column(Integer, default=0, server_default="0")
+    seiten_fertig: Mapped[int] = mapped_column(Integer, default=0, server_default="0")
+    # Lease gegen parallele Ausführung: solange in der Zukunft, hält ein Worker den Lauf
+    lauf_bis: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
 
     dossier: Mapped[Dossier] = relationship()
     befunde: Mapped[list["Befund"]] = relationship(

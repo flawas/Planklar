@@ -6,11 +6,11 @@ vorhandenen zu unterscheiden (`NotFoundError`, in der Web-Schicht 404).
 
 import uuid
 from collections.abc import Sequence
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 from typing import Any
 
 from fastapi import Depends, HTTPException, status
-from sqlalchemy import select
+from sqlalchemy import select, update
 from sqlalchemy.orm import Session
 
 from app.auth.users import current_user
@@ -107,6 +107,17 @@ class BueroScope:
             raise NotFoundError
         return seite
 
+    def get_or_add_seite(self, dokument_id: uuid.UUID, nummer: int) -> Seite:
+        """Seite (Dokument, Nummer); wird angelegt, falls noch nicht vorhanden."""
+        self.get_dokument(dokument_id)
+        stmt = select(Seite).where(Seite.dokument_id == dokument_id, Seite.nummer == nummer)
+        seite = self.session.scalars(stmt).one_or_none()
+        if seite is None:
+            seite = Seite(dokument_id=dokument_id, nummer=nummer)
+            self.session.add(seite)
+            self.session.flush()
+        return seite
+
     def update_seite(self, seite_id: uuid.UUID, **fields: Any) -> Seite:
         fields.pop("id", None)
         fields.pop("dokument_id", None)
@@ -145,7 +156,78 @@ class BueroScope:
         self.session.flush()
         return pruefung
 
+    def update_pruefung(self, pruefung_id: uuid.UUID, **fields: Any) -> Pruefung:
+        fields.pop("id", None)
+        fields.pop("dossier_id", None)
+        pruefung = self.get_pruefung(pruefung_id)
+        for key, value in fields.items():
+            setattr(pruefung, key, value)
+        self.session.flush()
+        return pruefung
+
+    def claim_pruefung(self, pruefung_id: uuid.UUID, lease: timedelta) -> bool:
+        """Reserviert den Lauf atomar (Lease); False, wenn ein anderer Worker ihn hält."""
+        self.get_pruefung(pruefung_id)
+        jetzt = datetime.now(UTC)
+        stmt = (
+            update(Pruefung)
+            .where(
+                Pruefung.id == pruefung_id,
+                (Pruefung.lauf_bis.is_(None)) | (Pruefung.lauf_bis < jetzt),
+            )
+            .values(lauf_bis=jetzt + lease)
+        )
+        claimed = self.session.execute(stmt).rowcount == 1
+        self.session.flush()
+        return claimed
+
+    def release_pruefung(self, pruefung_id: uuid.UUID) -> None:
+        self.get_pruefung(pruefung_id)
+        self.session.execute(
+            update(Pruefung).where(Pruefung.id == pruefung_id).values(lauf_bis=None)
+        )
+        self.session.flush()
+        self.session.expire_all()
+
+    def seite_fertig(self, pruefung_id: uuid.UUID, lease: timedelta) -> None:
+        """Zählt den Fortschritt atomar hoch und verlängert die Lease."""
+        self.get_pruefung(pruefung_id)
+        self.session.execute(
+            update(Pruefung)
+            .where(Pruefung.id == pruefung_id)
+            .values(seiten_fertig=Pruefung.seiten_fertig + 1, lauf_bis=datetime.now(UTC) + lease)
+        )
+        self.session.flush()
+        self.session.expire_all()
+
     # Befund
+    def save_befund(
+        self,
+        pruefung_id: uuid.UUID,
+        *,
+        regel_id: str,
+        ergebnis: Ergebnis,
+        belege: list[str] | None = None,
+    ) -> Befund:
+        """Schreibt den Befund je Regel neu; ein vorhandener Override bleibt erhalten."""
+        self.get_pruefung(pruefung_id)
+        stmt = select(Befund).where(Befund.pruefung_id == pruefung_id, Befund.regel_id == regel_id)
+        befund = self.session.scalars(stmt).one_or_none()
+        if befund is None:
+            return self.add_befund(pruefung_id, regel_id=regel_id, ergebnis=ergebnis, belege=belege)
+        befund.ergebnis = ergebnis
+        befund.belege = belege or []
+        self.session.flush()
+        return befund
+
+    def prune_befunde(self, pruefung_id: uuid.UUID, behalten: set[str]) -> None:
+        """Entfernt Befunde von Regeln, die im Lauf nicht mehr anwendbar sind."""
+        pruefung = self.get_pruefung(pruefung_id)
+        for befund in list(pruefung.befunde):
+            if befund.regel_id not in behalten:
+                pruefung.befunde.remove(befund)
+        self.session.flush()
+
     def list_befunde(self, pruefung_id: uuid.UUID) -> Sequence[Befund]:
         self.get_pruefung(pruefung_id)
         stmt = select(Befund).where(Befund.pruefung_id == pruefung_id).order_by(Befund.regel_id)

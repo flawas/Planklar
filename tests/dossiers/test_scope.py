@@ -1,6 +1,7 @@
 import uuid
 from collections.abc import Callable, Iterator
 from dataclasses import dataclass
+from datetime import timedelta
 from typing import Any
 
 import pytest
@@ -73,11 +74,20 @@ FREMDZUGRIFF: dict[str, Op] = {
     "list_seiten": lambda sc, w: sc.list_seiten(w.dokument_id),
     "get_seite": lambda sc, w: sc.get_seite(w.seite_id),
     "update_seite": lambda sc, w: sc.update_seite(w.seite_id, plantyp="grundriss"),
+    "get_or_add_seite": lambda sc, w: sc.get_or_add_seite(w.dokument_id, 2),
     "list_pruefungen": lambda sc, w: sc.list_pruefungen(w.dossier_id),
     "get_pruefung": lambda sc, w: sc.get_pruefung(w.pruefung_id),
     "add_pruefung": lambda sc, w: sc.add_pruefung(
         w.dossier_id, regelset_hash="x" * 64, modellversion="m"
     ),
+    "update_pruefung": lambda sc, w: sc.update_pruefung(w.pruefung_id, seiten_fertig=5),
+    "claim_pruefung": lambda sc, w: sc.claim_pruefung(w.pruefung_id, timedelta(minutes=1)),
+    "release_pruefung": lambda sc, w: sc.release_pruefung(w.pruefung_id),
+    "seite_fertig": lambda sc, w: sc.seite_fertig(w.pruefung_id, timedelta(minutes=1)),
+    "save_befund": lambda sc, w: sc.save_befund(
+        w.pruefung_id, regel_id="lu.r2", ergebnis=Ergebnis.ERFUELLT
+    ),
+    "prune_befunde": lambda sc, w: sc.prune_befunde(w.pruefung_id, set()),
     "list_befunde": lambda sc, w: sc.list_befunde(w.pruefung_id),
     "get_befund": lambda sc, w: sc.get_befund(w.befund_id),
     "add_befund": lambda sc, w: sc.add_befund(

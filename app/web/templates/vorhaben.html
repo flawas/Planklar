@@ -1,6 +1,6 @@
 {% extends "base.html" %}
-{% block title %}Neues Vorhaben{% endblock %}
+{% block title %}{% if v.dossier_id %}Vorhaben bearbeiten{% else %}Neues Vorhaben{% endif %}{% endblock %}
 {% block content %}
-<h1>Neues Vorhaben erfassen</h1>
+<h1>{% if v.dossier_id %}Vorhaben bearbeiten{% else %}Neues Vorhaben erfassen{% endif %}</h1>
 {% include "_vorhaben_schritt.html" %}
 {% endblock %}

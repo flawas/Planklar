@@ -3,6 +3,7 @@
 {% block title %}Dossier{% endblock %}
 {% block content %}
 <h1>Dossier {{ dossier.gemeinde }}</h1>
+<p><a href="/dossiers/{{ dossier.id }}/bearbeiten">Vorhaben bearbeiten</a></p>
 <h2>Dokumente hochladen</h2>
 <form class="formular" method="post" action="/dossiers/{{ dossier.id }}/upload"
       enctype="multipart/form-data"

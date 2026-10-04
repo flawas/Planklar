@@ -15,6 +15,7 @@ from sqlalchemy import (
     Integer,
     String,
     UniqueConstraint,
+    false,
     func,
     text,
 )
@@ -106,6 +107,10 @@ class Dossier(Base):
         _enum(Dossierstatus, "dossierstatus"),
         default=Dossierstatus.ENTWURF,
         server_default=Dossierstatus.ENTWURF.value,
+    )
+    # Ausdrückliches Einverständnis zur Nutzung im Evaluations-Set: nimmt vom Retention-Job aus
+    evaluation_einverstanden: Mapped[bool] = mapped_column(
+        Boolean, default=False, server_default=false()
     )
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
 

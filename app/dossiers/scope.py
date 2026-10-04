@@ -15,6 +15,7 @@ from sqlalchemy.orm import Session
 
 from app.auth.users import current_user
 from app.db.models import Befund, Dokument, Dossier, Ergebnis, Pruefstatus, Pruefung, Seite, User
+from app.db.rls import set_buero_kontext
 from app.db.session import get_session
 
 
@@ -26,6 +27,7 @@ class BueroScope:
     def __init__(self, session: Session, buero_id: uuid.UUID) -> None:
         self.session = session
         self.buero_id = buero_id
+        set_buero_kontext(session, buero_id)  # RLS: zweite Schutzschicht neben den Filtern
 
     # Dossier
     def list_dossiers(self) -> Sequence[Dossier]:
@@ -90,6 +92,13 @@ class BueroScope:
         self.get_dossier(dossier_id)
         stmt = select(Dokument).where(Dokument.dossier_id == dossier_id)
         return self.session.scalars(stmt.order_by(Dokument.created_at)).all()
+
+    def hat_dokument(self, dossier_id: uuid.UUID, sha256: str) -> bool:
+        self.get_dossier(dossier_id)
+        stmt = select(Dokument.id).where(
+            Dokument.dossier_id == dossier_id, Dokument.sha256 == sha256
+        )
+        return self.session.scalar(stmt) is not None
 
     def get_dokument(self, dokument_id: uuid.UUID) -> Dokument:
         stmt = (

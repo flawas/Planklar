@@ -62,3 +62,12 @@ Secrets stehen nur in `.env` bzw. als Docker Secrets auf dem Host, nie im Repo.
 - **GitHub-Secrets** (`AGENT_PAT`, `CLAUDE_CODE_OAUTH_TOKEN`): in den Repository-Einstellungen ersetzen und das alte Token widerrufen.
 
 Nach jeder Rotation `curl -fsS .../health` prüfen und das nächste Backup kontrollieren.
+
+## Row-Level Security (Datenbankrollen)
+
+Migration 0011 aktiviert RLS auf `dossier`, `dokument`, `seite`, `pruefung`, `befund` (mit `FORCE`) und legt die Rolle `liquet_app` an (NOBYPASSRLS, NOLOGIN). Superuser und Rollen mit `BYPASSRLS` umgehen RLS immer; die App darf deshalb nicht als `POSTGRES_USER` (Superuser) laufen.
+
+1. `python -m app.db.app_role` setzt Login und Passwort (`DB_APP_PASSWORD`) der Rolle; der Compose-Start (`web`) ruft es nach den Migrationen auf.
+2. Web, Worker und Beat verwenden diese Rolle in `DATABASE_URL`; `alembic upgrade head` und `app_role` laufen mit `MIGRATION_DATABASE_URL` (Besitzerrolle, Fallback `DATABASE_URL`).
+3. `REQUIRE_RLS_ROLE=true` (in Compose gesetzt) bricht den Start ab, wenn die App-Rolle Superuser ist oder `BYPASSRLS` hat; sonst warnt das Log mit `DB_ROLE_BYPASSES_RLS`.
+4. Jeder Pfad setzt den Büro-Kontext über `BueroScope` (`app/db/rls.py`). Ohne Kontext liefern Abfragen keine Zeilen, das ist beabsichtigt. Celery-Tasks erhalten `buero_id` als Argument; der Retention-Job setzt den Kontext je Büro.

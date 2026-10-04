@@ -4,12 +4,9 @@ from datetime import UTC, datetime
 from fastapi import APIRouter, Depends, HTTPException, Response, UploadFile, status
 from fastapi.exceptions import RequestValidationError
 from pydantic import BaseModel, ValidationError
-from sqlalchemy.orm import Session
 
-from app.auth.users import current_user
 from app.config import get_settings
-from app.db.models import Befund, Dokument, Dossier, Pruefstatus, Pruefung, User
-from app.db.session import get_session
+from app.db.models import Befund, Dokument, Dossier, Pruefstatus, Pruefung
 from app.dossiers import vorschau
 from app.dossiers.erwartung import ErwarteteUnterlagen, erwartete_unterlagen
 from app.dossiers.pruefung import LEASE, start_pruefung
@@ -26,10 +23,8 @@ from app.dossiers.schemas import (
 )
 from app.dossiers.scope import BueroScope, NotFoundError, get_scope, not_found
 from app.dossiers.service import (
-    DossierNotFoundError,
     UploadError,
     basename,
-    get_dossier,
     get_storage,
     upload_dokument,
 )
@@ -107,19 +102,18 @@ def update_dossier(
 async def upload(
     dossier_id: uuid.UUID,
     file: UploadFile,
-    user: User = Depends(current_user),
-    session: Session = Depends(get_session),
+    scope: BueroScope = Depends(get_scope),
     storage: Storage = Depends(get_storage),
 ) -> Dokument:
     try:
-        dossier = get_dossier(session, user.buero_id, dossier_id)
-    except DossierNotFoundError:
+        dossier = scope.get_dossier(dossier_id)
+    except NotFoundError:
         raise HTTPException(status.HTTP_404_NOT_FOUND, "DOSSIER_NOT_FOUND") from None
     limit = get_settings().max_upload_bytes
     data = await file.read(limit + 1)  # nie mehr als Limit + 1 Byte in den Speicher
     try:
         return upload_dokument(
-            session, storage, dossier, basename(file.filename or ""), data, limit
+            scope.session, storage, dossier, basename(file.filename or ""), data, limit
         )
     except UploadError as exc:
         raise HTTPException(_STATUS[exc.code], exc.code) from None

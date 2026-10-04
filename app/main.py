@@ -1,3 +1,4 @@
+import logging
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 
@@ -7,6 +8,7 @@ from fastapi.staticfiles import StaticFiles
 from app.auth.oidc import ensure_oidc_disabled
 from app.auth.router import admin_router, auth_router
 from app.config import get_settings
+from app.db.app_role import rls_umgehbar
 from app.db.session import get_sessionmaker
 from app.dossiers.router import dossier_router, vorschau_router
 from app.logging_setup import configure_logging, install_request_logging
@@ -15,12 +17,18 @@ from app.storage import Storage
 from app.web.router import BASE_DIR, web_router
 
 configure_logging()
+logger = logging.getLogger(__name__)
 
 
 @asynccontextmanager
 async def lifespan(_: FastAPI) -> AsyncIterator[None]:
     """Lädt den Regelkatalog und legt den Bucket an; ein ungültiger Katalog bricht den Start ab."""
     with get_sessionmaker()() as session:
+        if rls_umgehbar(session.connection()):
+            if get_settings().require_rls_role:
+                raise RuntimeError("DB_ROLE_BYPASSES_RLS")
+            logger.warning("DB_ROLE_BYPASSES_RLS: Row-Level Security ist wirkungslos")
+        session.rollback()
         lade_katalog(session, get_settings().git_commit)
     Storage().ensure_bucket()
     yield

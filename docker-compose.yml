@@ -9,7 +9,11 @@ x-app: &app
       GIT_COMMIT: ${GIT_COMMIT:-unbekannt}
   image: liquet:dev
   environment:
-    DATABASE_URL: postgresql+psycopg://liquet:liquet@db:5432/liquet
+    # App: Rolle `liquet_app` (ohne BYPASSRLS, ADR 0005); Migrationen: Besitzerrolle `liquet`.
+    DATABASE_URL: postgresql+psycopg://liquet_app:${DB_APP_PASSWORD:-liquet_app}@db:5432/liquet
+    MIGRATION_DATABASE_URL: postgresql+psycopg://liquet:liquet@db:5432/liquet
+    DB_APP_PASSWORD: ${DB_APP_PASSWORD:-liquet_app}
+    REQUIRE_RLS_ROLE: "true"
     REDIS_URL: redis://redis:6379/0
     S3_ENDPOINT: http://s3:8333
     S3_ACCESS_KEY: ${S3_ACCESS_KEY:-liquet}
@@ -50,7 +54,9 @@ services:
     command:
       - sh
       - -c
-      - alembic upgrade head && exec uvicorn app.main:app --host 0.0.0.0 --port 8000
+      - >-
+        alembic upgrade head && python -m app.db.app_role && exec uvicorn app.main:app --host
+        0.0.0.0 --port 8000
     ports:
       - "${WEB_PORT:-8000}:8000"
 

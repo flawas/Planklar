@@ -2,6 +2,7 @@
 
 import uuid
 from collections.abc import Mapping
+from datetime import timedelta
 from typing import Any
 
 import pymupdf
@@ -127,6 +128,50 @@ def test_wiederholung_ist_idempotent(db: Session, storage: Storage) -> None:
     assert lauf.fortschritt(scope, pruefung.id).seiten_fertig == 2
 
 
+def test_wiederholung_behaelt_manuelle_overrides(db: Session, storage: Storage) -> None:
+    scope, dossier = _dossier(db, storage)
+    pruefung = lauf.start_pruefung(scope, dossier.id)
+    db.commit()
+    lauf.run_pruefung(scope, storage, pruefung.id, client=FakeMerkmalClient())
+    befund = next(b for b in scope.list_befunde(pruefung.id) if b.ergebnis is Ergebnis.FEHLT)
+    scope.set_override(befund.id, Ergebnis.ERFUELLT, "Liegt in Papierform vor")
+    db.commit()
+
+    lauf.run_pruefung(scope, storage, pruefung.id, client=FakeMerkmalClient())
+
+    neu = scope.get_befund(befund.id)
+    assert neu.ergebnis is Ergebnis.FEHLT  # maschinelles Ergebnis neu geschrieben
+    assert neu.override_ergebnis is Ergebnis.ERFUELLT
+    assert neu.override_begruendung == "Liegt in Papierform vor"
+    assert neu.override_am is not None
+
+
+def test_zweiter_start_waehrend_lauf_wird_ignoriert(db: Session, storage: Storage) -> None:
+    scope, dossier = _dossier(db, storage)
+    pruefung = lauf.start_pruefung(scope, dossier.id)
+    db.commit()
+    assert scope.claim_pruefung(pruefung.id, lauf.LEASE)  # anderer Worker hält den Lauf
+    db.commit()
+
+    result = lauf.run_pruefung(scope, storage, pruefung.id, client=FakeMerkmalClient())
+
+    assert result.status is Pruefstatus.LAEUFT
+    assert scope.list_befunde(pruefung.id) == []
+    assert lauf.fortschritt(scope, pruefung.id).seiten_fertig == 0
+
+
+def test_abgelaufene_lease_erlaubt_neustart(db: Session, storage: Storage) -> None:
+    scope, dossier = _dossier(db, storage)
+    pruefung = lauf.start_pruefung(scope, dossier.id)
+    assert scope.claim_pruefung(pruefung.id, timedelta(seconds=-1))  # Worker abgestürzt
+    db.commit()
+
+    result = lauf.run_pruefung(scope, storage, pruefung.id, client=FakeMerkmalClient())
+
+    assert result.status is Pruefstatus.ABGESCHLOSSEN
+    assert result.lauf_bis is None
+
+
 def test_modellfehler_einer_seite_ergibt_unsicher_mit_fehlercode(
     db: Session, storage: Storage, monkeypatch: pytest.MonkeyPatch
 ) -> None:
@@ -166,7 +211,7 @@ def test_unlesbares_dokument_ergibt_unsicher_statt_abbruch(db: Session, storage:
     assert Ergebnis.ERFUELLT not in ergebnisse.values()
 
 
-def test_ausgefallenes_modell_ergibt_nie_erfuellt_fuer_merkmale(
+def test_ausgefallenes_modell_ergibt_nie_erfuellt_fuer_fehlende_belege(
     db: Session, storage: Storage
 ) -> None:
     scope, dossier = _dossier(db, storage)
@@ -175,7 +220,12 @@ def test_ausgefallenes_modell_ergibt_nie_erfuellt_fuer_merkmale(
     lauf.run_pruefung(scope, storage, pruefung.id, client=FakeMerkmalClient(fail=True))
     seiten = scope.list_seiten(scope.list_dokumente(dossier.id)[0].id)
     assert all(s.merkmale["_fehler"] == lauf.FEHLER_MERKMALE for s in seiten)
-    assert Ergebnis.ERFUELLT not in _ergebnisse(scope, pruefung.id).values()
+    ergebnisse = _ergebnisse(scope, pruefung.id)
+    # reine Typ-Regeln stützen sich auf die Text-Heuristik und bleiben erfüllt ...
+    assert ergebnisse["LU-PBV55-2a-situationsplan"] is Ergebnis.ERFUELLT
+    # ... was nicht vorliegt, wird durch den Modellausfall nicht zu erfüllt
+    assert ergebnisse["LU-PBV55-1-baugesuchsformular"] is Ergebnis.FEHLT
+    assert ergebnisse["LU-PBV56-1-unterschriftenblatt"] is Ergebnis.MANUELL
 
 
 def test_defekte_feldzuordnung_stoppt_den_lauf_nicht(

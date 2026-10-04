@@ -3,8 +3,11 @@
 Ablauf: Vorverarbeitung (Text, OCR-Fallback, Formularfelder, Render) -> Klassifikation ->
 Merkmalsextraktion -> Regelauswertung. Seiten und Befunde werden gespeichert.
 
-- Wiederholbar: Seiten werden je (Dokument, Nummer) überschrieben, Befunde des Laufs neu
-  geschrieben. Ein Retry liefert dasselbe Ergebnis, ohne Duplikate.
+- Wiederholbar: Seiten werden je (Dokument, Nummer) überschrieben, Befunde je Regel
+  aktualisiert (manuelle Overrides bleiben erhalten). Ein Retry liefert dasselbe Ergebnis,
+  ohne Duplikate.
+- Kein paralleler Lauf: ein atomarer Lease-Claim sperrt den Lauf; ein zweiter Start (Redelivery)
+  tut nichts, solange die Lease gültig ist.
 - Ein Fehler bei einer Seite (oder einem unlesbaren Dokument) stoppt den Lauf nicht: die
   Seite gilt als `Sonstiges` mit Konfidenz 0 bzw. ihre Merkmale als unsicher; der
   stabile Fehlercode steht in `Seite.merkmale["_fehler"]`. Daraus ergibt die Regel-Engine
@@ -16,7 +19,7 @@ Merkmalsextraktion -> Regelauswertung. Seiten und Befunde werden gespeichert.
 import logging
 import uuid
 from dataclasses import dataclass
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 from typing import Any
 
 from app.config import get_settings
@@ -40,6 +43,9 @@ log = logging.getLogger(__name__)
 FEHLER_DOKUMENT = "DOKUMENT_NICHT_LESBAR"
 FEHLER_KLASSIFIKATION = "KLASSIFIKATION_FEHLER"
 FEHLER_MERKMALE = "MERKMALE_FEHLER"
+
+# Ein Worker hält den Lauf per Lease; sie wird nach jeder Seite verlängert und verfällt bei Absturz.
+LEASE = timedelta(minutes=10)
 
 
 @dataclass(frozen=True)
@@ -165,8 +171,7 @@ def _verarbeite_dokument(
                 content.pages[nummer - 1].text, pages[nummer - 1], client, modelle
             )
         scope.update_seite(seite.id, **fields)
-        p = scope.get_pruefung(pruefung_id)
-        scope.update_pruefung(pruefung_id, seiten_fertig=p.seiten_fertig + 1)
+        scope.seite_fertig(pruefung_id, LEASE)
         scope.session.commit()
 
 
@@ -177,11 +182,18 @@ def run_pruefung(
     *,
     client: LLMClient | None = None,
 ) -> db.Pruefung:
-    """Führt den Prüflauf aus; wiederholbar (setzt Fortschritt und Befunde zurück)."""
+    """Führt den Prüflauf aus; wiederholbar (setzt den Fortschritt zurück, Overrides bleiben).
+
+    Hält bereits ein anderer Worker den Lauf, wird er unverändert zurückgegeben.
+    """
     pruefung = scope.get_pruefung(pruefung_id)
+    if not scope.claim_pruefung(pruefung_id, LEASE):
+        scope.session.rollback()
+        log.warning("Prüflauf %s läuft bereits, Start ignoriert", pruefung_id)
+        return scope.get_pruefung(pruefung_id)
+    scope.session.commit()
     dossier = pruefung.dossier
     dokumente = list(scope.list_dokumente(dossier.id))
-    scope.clear_befunde(pruefung_id)
     scope.update_pruefung(
         pruefung_id,
         status=db.Pruefstatus.LAEUFT,
@@ -212,6 +224,7 @@ def run_pruefung(
             "gemeinde": dossier.gemeinde,
             "vorhabenstyp": dossier.vorhabenstyp.value,
         }
+        behalten: set[str] = set()
         for bewertung in applicable_rules(regelset, vorhaben):
             if bewertung.anwendbarkeit is Anwendbarkeit.NICHT_ANWENDBAR:
                 continue
@@ -220,12 +233,15 @@ def run_pruefung(
             else:
                 befund = pruefe(bewertung.regel, evidenz)
                 ergebnis, belege = befund.ergebnis, befund.seiten
-            scope.add_befund(
+            behalten.add(bewertung.regel.id)
+            scope.save_befund(
                 pruefung_id,
                 regel_id=bewertung.regel.id,
                 ergebnis=db.Ergebnis(ergebnis.value),
                 belege=list(belege),
             )
+        scope.prune_befunde(pruefung_id, behalten)
+        scope.release_pruefung(pruefung_id)
         scope.update_pruefung(
             pruefung_id,
             status=db.Pruefstatus.ABGESCHLOSSEN,
@@ -235,6 +251,7 @@ def run_pruefung(
         )
     except Exception as exc:
         scope.session.rollback()
+        scope.release_pruefung(pruefung_id)
         scope.update_pruefung(
             pruefung_id, status=db.Pruefstatus.FEHLGESCHLAGEN, beendet_am=datetime.now(UTC)
         )

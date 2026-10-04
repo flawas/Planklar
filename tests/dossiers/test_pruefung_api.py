@@ -15,16 +15,6 @@ from tests.dossiers.test_dossier_api import BODY
 from tests.dossiers.test_upload import login
 
 
-@pytest.fixture
-def enqueued(monkeypatch: pytest.MonkeyPatch) -> list[tuple[str, str]]:
-    calls: list[tuple[str, str]] = []
-    monkeypatch.setattr(
-        "app.dossiers.router.run_pruefung_task.delay",
-        lambda buero_id, pruefung_id: calls.append((buero_id, pruefung_id)),
-    )
-    return calls
-
-
 def _dossier(client: TestClient, db: Session, email: str = "a@buero-a.ch") -> str:
     make_user(db, email)
     login(client, email)

@@ -135,3 +135,30 @@ class BefundRead(BaseModel):
     override_ergebnis: Ergebnis | None
     override_begruendung: str | None
     override_am: datetime | None
+
+
+class OverrideCreate(BaseModel):
+    ergebnis: Ergebnis
+    begruendung: str = Field(max_length=2000)
+
+    @field_validator("begruendung")
+    @classmethod
+    def _nicht_leer(cls, value: str) -> str:
+        if not value.strip():
+            raise ValueError("Begründung ist Pflicht")
+        return value.strip()
+
+
+class OverrideExport(BaseModel):
+    """Override für das Evaluations-Set: Original-Ergebnis bleibt neben der Korrektur stehen."""
+
+    model_config = ConfigDict(from_attributes=True)
+
+    befund_id: uuid.UUID
+    regel_id: str
+    ergebnis: Ergebnis
+    override_ergebnis: Ergebnis
+    override_begruendung: str
+    override_am: datetime
+    regelset_hash: str
+    modellversion: str

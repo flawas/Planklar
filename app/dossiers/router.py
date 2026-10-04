@@ -1,15 +1,16 @@
 import uuid
 from datetime import UTC, datetime
 
-from fastapi import APIRouter, Depends, HTTPException, UploadFile, status
+from fastapi import APIRouter, Depends, HTTPException, Response, UploadFile, status
 from fastapi.exceptions import RequestValidationError
-from pydantic import ValidationError
+from pydantic import BaseModel, ValidationError
 from sqlalchemy.orm import Session
 
 from app.auth.users import current_user
 from app.config import get_settings
 from app.db.models import Befund, Dokument, Dossier, Pruefstatus, Pruefung, User
 from app.db.session import get_session
+from app.dossiers import vorschau
 from app.dossiers.erwartung import ErwarteteUnterlagen, erwartete_unterlagen
 from app.dossiers.pruefung import LEASE, start_pruefung
 from app.dossiers.schemas import (
@@ -18,6 +19,8 @@ from app.dossiers.schemas import (
     DossierCreate,
     DossierRead,
     DossierUpdate,
+    OverrideCreate,
+    OverrideExport,
     PruefungRead,
     validate_attribute,
 )
@@ -30,7 +33,7 @@ from app.dossiers.service import (
     get_storage,
     upload_dokument,
 )
-from app.storage import Storage
+from app.storage import ObjectNotFoundError, Storage
 from app.worker import run_pruefung_task
 
 dossier_router = APIRouter(prefix="/dossiers", tags=["dossiers"])
@@ -188,3 +191,95 @@ def list_befunde(
 ) -> list[Befund]:
     _pruefung_im_dossier(scope, dossier_id, pruefung_id)
     return list(scope.list_befunde(pruefung_id))
+
+
+class VorschauUrl(BaseModel):
+    url: str
+    gueltig_sekunden: int
+
+
+@dossier_router.get("/{dossier_id}/seiten/{seite_id}/vorschau-url", response_model=VorschauUrl)
+def vorschau_url(
+    dossier_id: uuid.UUID, seite_id: uuid.UUID, scope: BueroScope = Depends(get_scope)
+) -> VorschauUrl:
+    try:
+        seite = scope.get_seite(seite_id)
+        if scope.get_dokument(seite.dokument_id).dossier_id != dossier_id:
+            raise NotFoundError
+    except NotFoundError:
+        raise not_found() from None
+    return VorschauUrl(
+        url=vorschau.url_fuer(scope.buero_id, seite.id),
+        gueltig_sekunden=get_settings().signed_url_ttl_seconds,
+    )
+
+
+vorschau_router = APIRouter(tags=["dossiers"])
+
+
+@vorschau_router.get("/vorschau/{token}", response_class=Response)
+def vorschau_bild(
+    token: str,
+    scope: BueroScope = Depends(get_scope),
+    storage: Storage = Depends(get_storage),
+) -> Response:
+    try:
+        buero_id, seite_id = vorschau.verify(token)
+        if buero_id != scope.buero_id:
+            raise vorschau.TokenError
+        seite = scope.get_seite(seite_id)
+        png = vorschau.render_seite(scope, storage, seite)
+    except (vorschau.TokenError, NotFoundError, ObjectNotFoundError):
+        raise not_found() from None
+    return Response(png, media_type="image/png", headers={"Cache-Control": "private, no-store"})
+
+
+def _befund_in_pruefung(scope: BueroScope, pruefung: Pruefung, befund_id: uuid.UUID) -> Befund:
+    try:
+        befund = scope.get_befund(befund_id)
+    except NotFoundError:
+        raise not_found() from None
+    if befund.pruefung_id != pruefung.id:
+        raise not_found()
+    return befund
+
+
+@dossier_router.put(
+    "/{dossier_id}/pruefungen/{pruefung_id}/befunde/{befund_id}/override",
+    response_model=BefundRead,
+)
+def set_override(
+    dossier_id: uuid.UUID,
+    pruefung_id: uuid.UUID,
+    befund_id: uuid.UUID,
+    body: OverrideCreate,
+    scope: BueroScope = Depends(get_scope),
+) -> Befund:
+    pruefung = _pruefung_im_dossier(scope, dossier_id, pruefung_id)
+    _befund_in_pruefung(scope, pruefung, befund_id)
+    befund = scope.set_override(befund_id, body.ergebnis, body.begruendung)
+    scope.session.commit()
+    return befund
+
+
+@dossier_router.get(
+    "/{dossier_id}/pruefungen/{pruefung_id}/overrides", response_model=list[OverrideExport]
+)
+def list_overrides(
+    dossier_id: uuid.UUID, pruefung_id: uuid.UUID, scope: BueroScope = Depends(get_scope)
+) -> list[OverrideExport]:
+    pruefung = _pruefung_im_dossier(scope, dossier_id, pruefung_id)
+    return [
+        OverrideExport(
+            befund_id=b.id,
+            regel_id=b.regel_id,
+            ergebnis=b.ergebnis,
+            override_ergebnis=b.override_ergebnis,
+            override_begruendung=b.override_begruendung or "",
+            override_am=b.override_am,
+            regelset_hash=pruefung.regelset_hash,
+            modellversion=pruefung.modellversion,
+        )
+        for b in scope.list_befunde(pruefung_id)
+        if b.override_ergebnis is not None and b.override_am is not None
+    ]

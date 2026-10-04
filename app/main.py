@@ -6,7 +6,7 @@ from fastapi import FastAPI
 from fastapi.staticfiles import StaticFiles
 
 from app.auth.oidc import ensure_oidc_disabled
-from app.auth.router import admin_router, auth_router
+from app.auth.router import admin_router, auth_router, plattform_router
 from app.config import get_settings
 from app.db.app_role import rls_umgehbar
 from app.db.session import get_sessionmaker
@@ -39,6 +39,7 @@ install_request_logging(app)
 ensure_oidc_disabled(get_settings())
 app.include_router(auth_router)
 app.include_router(admin_router)
+app.include_router(plattform_router)
 app.include_router(dossier_router)
 app.include_router(vorschau_router)
 app.include_router(web_router)

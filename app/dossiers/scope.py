@@ -10,11 +10,21 @@ from datetime import UTC, datetime, timedelta
 from typing import Any
 
 from fastapi import Depends, HTTPException, status
-from sqlalchemy import select, update
+from sqlalchemy import func, select, update
 from sqlalchemy.orm import Session
 
 from app.auth.users import current_user
-from app.db.models import Befund, Dokument, Dossier, Ergebnis, Pruefstatus, Pruefung, Seite, User
+from app.db.models import (
+    Befund,
+    Dokument,
+    Dossier,
+    Ergebnis,
+    LlmNutzung,
+    Pruefstatus,
+    Pruefung,
+    Seite,
+    User,
+)
 from app.db.rls import set_buero_kontext
 from app.db.session import get_session
 
@@ -33,6 +43,11 @@ class BueroScope:
     def list_dossiers(self) -> Sequence[Dossier]:
         stmt = select(Dossier).where(Dossier.buero_id == self.buero_id)
         return self.session.scalars(stmt.order_by(Dossier.created_at)).all()
+
+    def anzahl_dossiers(self) -> int:
+        """Nur die Anzahl, keine Inhalte (Plattform-Übersicht)."""
+        stmt = select(func.count()).select_from(Dossier).where(Dossier.buero_id == self.buero_id)
+        return self.session.scalar(stmt) or 0
 
     def get_dossier(self, dossier_id: uuid.UUID) -> Dossier:
         stmt = select(Dossier).where(Dossier.id == dossier_id, Dossier.buero_id == self.buero_id)
@@ -340,6 +355,35 @@ class BueroScope:
         befund.override_am = None
         self.session.flush()
         return befund
+
+    # LLM-Nutzung (Abrechnung)
+    def add_llm_nutzung(self, **fields: Any) -> LlmNutzung:
+        fields.pop("buero_id", None)
+        nutzung = LlmNutzung(buero_id=self.buero_id, **fields)
+        self.session.add(nutzung)
+        self.session.flush()
+        return nutzung
+
+    def llm_nutzung_summen(self, von: datetime, bis: datetime) -> Sequence[Any]:
+        """Aufrufe, Token und Kosten je Modell im Zeitraum [von, bis)."""
+        stmt = (
+            select(
+                LlmNutzung.modell,
+                func.count().label("aufrufe"),
+                func.sum(LlmNutzung.input_tokens).label("input_tokens"),
+                func.sum(LlmNutzung.output_tokens).label("output_tokens"),
+                func.sum(LlmNutzung.kosten_usd).label("kosten_usd"),
+                func.count().filter(LlmNutzung.kosten_usd.is_(None)).label("ohne_preis"),
+            )
+            .where(
+                LlmNutzung.buero_id == self.buero_id,
+                LlmNutzung.created_at >= von,
+                LlmNutzung.created_at < bis,
+            )
+            .group_by(LlmNutzung.modell)
+            .order_by(LlmNutzung.modell)
+        )
+        return self.session.execute(stmt).all()
 
 
 def get_scope(

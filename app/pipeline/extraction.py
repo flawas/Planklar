@@ -62,6 +62,7 @@ def extract_feature(
                     text=text,
                     image_mime=image_mime,
                     client=client,
+                    zweck="merkmal",
                 )
             )
         except LLMResponseError:

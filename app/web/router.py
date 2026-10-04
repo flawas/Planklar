@@ -3,12 +3,26 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Annotated
 
-from fastapi import APIRouter, Depends, File, Form, HTTPException, Request, UploadFile, status
+from fastapi import (
+    APIRouter,
+    BackgroundTasks,
+    Depends,
+    File,
+    Form,
+    HTTPException,
+    Request,
+    UploadFile,
+    status,
+)
 from fastapi.responses import HTMLResponse, RedirectResponse, Response
 from fastapi.security import OAuth2PasswordRequestForm
 from fastapi.templating import Jinja2Templates
+from pydantic import EmailStr, TypeAdapter, ValidationError
 from sqlalchemy.orm import Session
 
+from app.auth import einladung as einladung_svc
+from app.auth import plattform
+from app.auth.tokens import jetzt
 from app.auth.users import (
     COOKIE_NAME,
     UserManager,
@@ -17,12 +31,13 @@ from app.auth.users import (
     get_user_manager,
 )
 from app.config import get_settings
-from app.db.models import Dossier, Ergebnis, Pruefung, User
+from app.db.models import Dossier, Ergebnis, Pruefung, Rolle, User
 from app.db.session import get_session
 from app.dossiers.pruefung import LEASE
 from app.dossiers.router import start_pruefung_endpoint
 from app.dossiers.scope import BueroScope, NotFoundError
 from app.dossiers.service import UploadError, basename, get_storage, upload_dokument
+from app.mail import Mailer, get_mailer, send_safely
 from app.pipeline import llm_config
 from app.reports import bericht as berichte
 from app.reports.pdf import render_pdf
@@ -48,6 +63,18 @@ MSG_SCHRITT = "Ungültiger Schritt im Assistenten."
 MSG_NOT_LOGGED_IN = "Bitte melden Sie sich an."
 MSG_FORBIDDEN = "Dafür fehlt Ihnen die Berechtigung."
 MSG_GESPEICHERT = "Einstellungen gespeichert."
+MSG_BUERO_ANGELEGT = "Büro angelegt. Die Einladung an den ersten Administrator wurde versandt."
+MSG_BUERO_EMAIL = "Diese E-Mail-Adresse hat bereits ein Konto."
+MSG_BUERO_MAIL_UNGUELTIG = "Bitte geben Sie eine gültige E-Mail-Adresse an."
+MSG_BUERO_NAME = "Bitte geben Sie einen Namen (max. 200 Zeichen) an."
+MSG_BUERO_UNBEKANNT = "Büro nicht gefunden."
+MSG_EINLADUNG_VERSANDT = "Einladung versandt (7 Tage gültig)."
+MSG_EINLADUNG_WIDERRUFEN = "Einladung widerrufen."
+MSG_EINLADUNG_OFFEN = (
+    "Für diese Adresse gibt es bereits eine offene Einladung. "
+    "Senden Sie sie erneut oder widerrufen Sie sie."
+)
+MSG_EINLADUNG_UNBEKANNT = "Einladung nicht gefunden."
 
 
 @dataclass
@@ -463,6 +490,145 @@ def ki_verbindung_testen(
     return _ki_seite(request, user, session, meldung=meldung, ok=ok)
 
 
+def _plattform_seite(
+    request: Request,
+    user: User,
+    session: Session,
+    *,
+    meldung: str | None = None,
+    ok: bool = True,
+    werte: dict[str, str] | None = None,
+    status_code: int = 200,
+) -> Response:
+    return _render(
+        request,
+        "plattform.html",
+        user=user,
+        status_code=status_code,
+        bueros=plattform.liste_bueros(session),
+        meldung=meldung,
+        ok=ok,
+        werte=werte or {"name": "", "admin_email": ""},
+    )
+
+
+def _plattform_pruefen(
+    request: Request, user: User | None, csrf_token: str
+) -> tuple[User | None, Response | None]:
+    """Gemeinsame Zugriffsprüfung der Plattform-Aktionen (POST)."""
+    if user is None:
+        return None, _render(request, "_fehler.html", status_code=401, error=MSG_NOT_LOGGED_IN)
+    if not user.is_plattform_admin:
+        return None, _render(
+            request, "_fehler.html", user=user, status_code=403, error=MSG_FORBIDDEN
+        )
+    if csrf_token is not None and not csrf.matches(
+        request.cookies.get(csrf.CSRF_COOKIE), csrf_token
+    ):
+        return None, _render(request, "_fehler.html", user=user, status_code=403, error=MSG_CSRF)
+    return user, None
+
+
+@web_router.get("/plattform", response_model=None)
+def plattform_uebersicht(
+    request: Request,
+    user: Annotated[User | None, Depends(_optional_user)],
+    session: Session = Depends(get_session),
+) -> Response:
+    if user is None:
+        return RedirectResponse("/login", status.HTTP_303_SEE_OTHER)
+    if not user.is_plattform_admin:
+        return _render(request, "_fehler.html", user=user, status_code=403, error=MSG_FORBIDDEN)
+    return _plattform_seite(request, user, session)
+
+
+@web_router.post("/plattform/neu", response_model=None)
+def plattform_buero_anlegen(
+    request: Request,
+    background: BackgroundTasks,
+    user: Annotated[User | None, Depends(_optional_user)],
+    name: Annotated[str, Form()] = "",
+    admin_email: Annotated[str, Form()] = "",
+    csrf_token: Annotated[str, Form()] = "",
+    session: Session = Depends(get_session),
+    mailer: Mailer = Depends(get_mailer),
+) -> Response:
+    admin, fehler = _plattform_pruefen(request, user, csrf_token)
+    if admin is None:
+        return fehler  # type: ignore[return-value]
+    werte = {"name": name.strip(), "admin_email": admin_email.strip()}
+    if not werte["name"] or len(werte["name"]) > 200:
+        return _plattform_seite(
+            request, admin, session, meldung=MSG_BUERO_NAME, ok=False, werte=werte, status_code=422
+        )
+    try:
+        TypeAdapter(EmailStr).validate_python(werte["admin_email"])
+    except ValidationError:
+        return _plattform_seite(
+            request,
+            admin,
+            session,
+            meldung=MSG_BUERO_MAIL_UNGUELTIG,
+            ok=False,
+            werte=werte,
+            status_code=422,
+        )
+    try:
+        _, mail = plattform.lege_buero_an(session, werte["name"], werte["admin_email"])
+    except einladung_svc.EmailExistiertError:
+        return _plattform_seite(
+            request, admin, session, meldung=MSG_BUERO_EMAIL, ok=False, werte=werte, status_code=409
+        )
+    background.add_task(send_safely, mailer, mail)
+    return _plattform_seite(request, admin, session, meldung=MSG_BUERO_ANGELEGT)
+
+
+@web_router.post("/plattform/{buero_id}/name", response_model=None)
+def plattform_buero_umbenennen(
+    request: Request,
+    buero_id: uuid.UUID,
+    user: Annotated[User | None, Depends(_optional_user)],
+    name: Annotated[str, Form()] = "",
+    csrf_token: Annotated[str, Form()] = "",
+    session: Session = Depends(get_session),
+) -> Response:
+    admin, fehler = _plattform_pruefen(request, user, csrf_token)
+    if admin is None:
+        return fehler  # type: ignore[return-value]
+    if not name.strip() or len(name.strip()) > 200:
+        return _plattform_seite(
+            request, admin, session, meldung=MSG_BUERO_NAME, ok=False, status_code=422
+        )
+    try:
+        plattform.benenne_um(session, buero_id, name)
+    except plattform.BueroNotFoundError:
+        return _plattform_seite(
+            request, admin, session, meldung=MSG_BUERO_UNBEKANNT, ok=False, status_code=404
+        )
+    return _plattform_seite(request, admin, session, meldung=MSG_GESPEICHERT)
+
+
+@web_router.post("/plattform/{buero_id}/status", response_model=None)
+def plattform_buero_sperren(
+    request: Request,
+    buero_id: uuid.UUID,
+    user: Annotated[User | None, Depends(_optional_user)],
+    aktiv: Annotated[str, Form()] = "",
+    csrf_token: Annotated[str, Form()] = "",
+    session: Session = Depends(get_session),
+) -> Response:
+    admin, fehler = _plattform_pruefen(request, user, csrf_token)
+    if admin is None:
+        return fehler  # type: ignore[return-value]
+    try:
+        plattform.setze_aktiv(session, buero_id, aktiv == "1")
+    except plattform.BueroNotFoundError:
+        return _plattform_seite(
+            request, admin, session, meldung=MSG_BUERO_UNBEKANNT, ok=False, status_code=404
+        )
+    return _plattform_seite(request, admin, session, meldung=MSG_GESPEICHERT)
+
+
 MSG_BEGRUENDUNG = "Bitte geben Sie eine Begründung an."
 MSG_START = {
     "KEINE_DOKUMENTE": "Bitte laden Sie zuerst Dokumente hoch.",
@@ -703,3 +869,139 @@ async def befund_aktion(
     if aktion not in {"override", "bestaetigen", "zuruecksetzen"}:
         return _render(request, "nicht_gefunden.html", user=user, status_code=404)
     return await _befund_aktion(request, dossier_id, pruefung_id, befund_id, user, session, aktion)
+
+
+def _einladungen_seite(
+    request: Request,
+    user: User,
+    session: Session,
+    *,
+    meldung: str | None = None,
+    ok: bool = True,
+    werte: dict[str, str] | None = None,
+    status_code: int = 200,
+) -> Response:
+    return _render(
+        request,
+        "einladungen.html",
+        user=user,
+        status_code=status_code,
+        einladungen=einladung_svc.liste_einladungen(session, user.buero_id),
+        jetzt=jetzt(),
+        meldung=meldung,
+        ok=ok,
+        werte=werte or {"email": "", "rolle": Rolle.MITARBEITER.value},
+    )
+
+
+def _einladungen_pruefen(
+    request: Request, user: User | None, csrf_token: str
+) -> tuple[User | None, Response | None]:
+    """Zugriffsprüfung der Einladungs-Aktionen (POST): angemeldet, Büro-Admin, CSRF."""
+    if user is None:
+        return None, _render(request, "_fehler.html", status_code=401, error=MSG_NOT_LOGGED_IN)
+    if user.rolle != Rolle.BUERO_ADMIN:
+        return None, _render(
+            request, "_fehler.html", user=user, status_code=403, error=MSG_FORBIDDEN
+        )
+    if csrf_token is not None and not csrf.matches(
+        request.cookies.get(csrf.CSRF_COOKIE), csrf_token
+    ):
+        return None, _render(request, "_fehler.html", user=user, status_code=403, error=MSG_CSRF)
+    return user, None
+
+
+@web_router.get("/einladungen", response_model=None)
+def einladungen_uebersicht(
+    request: Request,
+    user: Annotated[User | None, Depends(_optional_user)],
+    session: Session = Depends(get_session),
+) -> Response:
+    if user is None:
+        return RedirectResponse("/login", status.HTTP_303_SEE_OTHER)
+    if user.rolle != Rolle.BUERO_ADMIN:
+        return _render(request, "_fehler.html", user=user, status_code=403, error=MSG_FORBIDDEN)
+    return _einladungen_seite(request, user, session)
+
+
+@web_router.post("/einladungen", response_model=None)
+def einladung_senden(
+    request: Request,
+    background: BackgroundTasks,
+    user: Annotated[User | None, Depends(_optional_user)],
+    email: Annotated[str, Form()] = "",
+    rolle: Annotated[str, Form()] = Rolle.MITARBEITER.value,
+    csrf_token: Annotated[str, Form()] = "",
+    session: Session = Depends(get_session),
+    mailer: Mailer = Depends(get_mailer),
+) -> Response:
+    admin, fehler = _einladungen_pruefen(request, user, csrf_token)
+    if admin is None:
+        return fehler  # type: ignore[return-value]
+    werte = {"email": email.strip(), "rolle": rolle}
+
+    def abgelehnt(meldung: str, code: int) -> Response:
+        return _einladungen_seite(
+            request, admin, session, meldung=meldung, ok=False, werte=werte, status_code=code
+        )
+
+    try:
+        TypeAdapter(EmailStr).validate_python(werte["email"])
+        rolle_wert = Rolle(rolle)
+    except (ValidationError, ValueError):
+        return abgelehnt(MSG_BUERO_MAIL_UNGUELTIG, 422)
+    try:
+        _, mail = einladung_svc.erstelle_einladung(
+            session, admin.buero_id, werte["email"], rolle_wert
+        )
+    except einladung_svc.EmailExistiertError:
+        return abgelehnt(MSG_BUERO_EMAIL, 409)
+    except einladung_svc.EinladungOffenError:
+        return abgelehnt(MSG_EINLADUNG_OFFEN, 409)
+    background.add_task(send_safely, mailer, mail)
+    return _einladungen_seite(request, admin, session, meldung=MSG_EINLADUNG_VERSANDT)
+
+
+@web_router.post("/einladungen/{einladung_id}/erneut", response_model=None)
+def einladung_erneut(
+    request: Request,
+    einladung_id: uuid.UUID,
+    background: BackgroundTasks,
+    user: Annotated[User | None, Depends(_optional_user)],
+    csrf_token: Annotated[str, Form()] = "",
+    session: Session = Depends(get_session),
+    mailer: Mailer = Depends(get_mailer),
+) -> Response:
+    admin, fehler = _einladungen_pruefen(request, user, csrf_token)
+    if admin is None:
+        return fehler  # type: ignore[return-value]
+    try:
+        ergebnis = einladung_svc.sende_einladung_erneut(session, admin.buero_id, einladung_id)
+    except einladung_svc.EmailExistiertError:
+        return _einladungen_seite(
+            request, admin, session, meldung=MSG_BUERO_EMAIL, ok=False, status_code=409
+        )
+    if ergebnis is None:
+        return _einladungen_seite(
+            request, admin, session, meldung=MSG_EINLADUNG_UNBEKANNT, ok=False, status_code=404
+        )
+    background.add_task(send_safely, mailer, ergebnis[1])
+    return _einladungen_seite(request, admin, session, meldung=MSG_EINLADUNG_VERSANDT)
+
+
+@web_router.post("/einladungen/{einladung_id}/widerruf", response_model=None)
+def einladung_widerrufen(
+    request: Request,
+    einladung_id: uuid.UUID,
+    user: Annotated[User | None, Depends(_optional_user)],
+    csrf_token: Annotated[str, Form()] = "",
+    session: Session = Depends(get_session),
+) -> Response:
+    admin, fehler = _einladungen_pruefen(request, user, csrf_token)
+    if admin is None:
+        return fehler  # type: ignore[return-value]
+    if not einladung_svc.widerrufe_einladung(session, admin.buero_id, einladung_id):
+        return _einladungen_seite(
+            request, admin, session, meldung=MSG_EINLADUNG_UNBEKANNT, ok=False, status_code=404
+        )
+    return _einladungen_seite(request, admin, session, meldung=MSG_EINLADUNG_WIDERRUFEN)

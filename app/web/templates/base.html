@@ -18,7 +18,9 @@
     <nav class="navi" aria-label="Hauptnavigation">
       <a class="btn text" href="/vorhaben">{{ icon("folder_open") }}Vorhaben</a>
       <a class="btn text" href="/vorhaben/neu">{{ icon("add") }}Neu</a>
-      {% if user.is_plattform_admin %}<a class="btn text" href="/einstellungen/ki">{{ icon("settings") }}KI</a>{% endif %}
+      {% if user.rolle == "buero_admin" %}<a class="btn text" href="/einladungen">{{ icon("settings") }}Einladungen</a>{% endif %}
+      {% if user.is_plattform_admin %}<a class="btn text" href="/plattform">{{ icon("settings") }}Büros</a>
+      <a class="btn text" href="/einstellungen/ki">{{ icon("settings") }}KI</a>{% endif %}
       <form method="post" action="/logout" class="abmelden">
         <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
         <span>{{ user.email }}</span>

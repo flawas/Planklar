@@ -1,0 +1,62 @@
+{% from "_icons.html" import icon %}
+{% extends "base.html" %}
+{% block title %}Einladungen{% endblock %}
+{% block content %}
+<h1>Einladungen</h1>
+<p>Laden Sie Mitarbeitende in Ihr Büro ein. Pro Adresse kann nur eine offene Einladung bestehen;
+  eine bestehende können Sie erneut senden oder widerrufen.</p>
+{% if meldung %}<p role="status" class="{{ 'ok' if ok else 'fehler' }}">{{ meldung }}</p>{% endif %}
+<table class="liste">
+  <caption class="nur-sr">Einladungen</caption>
+  <thead>
+    <tr>
+      <th scope="col">E-Mail</th><th scope="col">Rolle</th><th scope="col">Status</th>
+      <th scope="col">Gültig bis</th><th scope="col"><span class="nur-sr">Aktionen</span></th>
+    </tr>
+  </thead>
+  <tbody>
+    {% for e in einladungen %}
+    {% if e.used_at %}{% set zustand = "Eingelöst" %}
+    {% elif e.revoked_at %}{% set zustand = "Widerrufen" %}
+    {% elif e.expires_at < jetzt %}{% set zustand = "Abgelaufen" %}
+    {% else %}{% set zustand = "Offen" %}{% endif %}
+    <tr>
+      <td>{{ e.email }}</td>
+      <td>{{ "Administrator" if e.rolle == "buero_admin" else "Mitarbeiter" }}</td>
+      <td>{{ zustand }}</td>
+      <td>{{ e.expires_at.strftime("%d.%m.%Y") }}</td>
+      <td>
+        {% if not e.used_at %}
+        <form method="post" action="/einladungen/{{ e.id }}/erneut">
+          <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+          <button type="submit" class="zweit">Erneut senden</button>
+        </form>
+        {% endif %}
+        {% if zustand == "Offen" %}
+        <form method="post" action="/einladungen/{{ e.id }}/widerruf">
+          <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+          <button type="submit" class="zweit">Widerrufen</button>
+        </form>
+        {% endif %}
+      </td>
+    </tr>
+    {% else %}
+    <tr><td colspan="5">Noch keine Einladungen.</td></tr>
+    {% endfor %}
+  </tbody>
+</table>
+
+<h2>Neue Einladung</h2>
+<form method="post" action="/einladungen" class="formular">
+  <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+  <label for="ein-email">E-Mail</label>
+  <input id="ein-email" name="email" type="email" value="{{ werte.email }}" required>
+  <label for="ein-rolle">Rolle</label>
+  <select id="ein-rolle" name="rolle">
+    <option value="mitarbeiter" {{ "selected" if werte.rolle == "mitarbeiter" }}>Mitarbeiter</option>
+    <option value="buero_admin" {{ "selected" if werte.rolle == "buero_admin" }}>Administrator</option>
+  </select>
+  <button type="submit">Einladung senden</button>
+</form>
+<p><a class="btn text" href="/">{{ icon("arrow_back") }}Zurück</a></p>
+{% endblock %}

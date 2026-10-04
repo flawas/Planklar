@@ -11,7 +11,7 @@ import pytest
 
 APP = Path(__file__).resolve().parents[1] / "app"
 ERLAUBT = {APP / "dossiers" / "scope.py", APP / "db" / "models.py"}
-GESCHUETZT = {"Dossier", "Dokument", "Seite", "Pruefung", "Befund"}
+GESCHUETZT = {"Dossier", "Dokument", "Seite", "Pruefung", "Befund", "LlmNutzung"}
 # Konstruktionen, die Zeilen eines Modells lesen oder verändern
 ABFRAGEN = {"select", "update", "delete", "insert", "query", "get", "get_one", "merge", "refresh"}
 

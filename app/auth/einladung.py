@@ -3,6 +3,7 @@
 import uuid
 
 from sqlalchemy import func, select
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from app.auth.tokens import (
@@ -24,6 +25,10 @@ class EmailExistiertError(Exception):
     pass
 
 
+class EinladungOffenError(Exception):
+    """Für diese Adresse existiert im Büro bereits eine offene Einladung."""
+
+
 def _user_by_email(db: Session, email: str) -> User | None:
     stmt = select(User).where(func.lower(User.email) == email.lower())
     return db.execute(stmt).scalar_one_or_none()
@@ -32,7 +37,7 @@ def _user_by_email(db: Session, email: str) -> User | None:
 def erstelle_einladung(
     db: Session, buero_id: uuid.UUID, email: str, rolle: Rolle
 ) -> tuple[Einladung, Mail]:
-    """Legt die Einladung an; offene Einladungen derselben Adresse im Büro werden widerrufen."""
+    """Legt die Einladung an. `EinladungOffenError`, solange eine gültige offene existiert."""
     if _user_by_email(db, email) is not None:
         raise EmailExistiertError
     offene = db.execute(
@@ -44,7 +49,10 @@ def erstelle_einladung(
         )
     ).scalars()
     for alt in offene:
-        alt.revoked_at = jetzt()
+        if alt.expires_at > jetzt():
+            raise EinladungOffenError
+        alt.revoked_at = jetzt()  # abgelaufen: aufräumen, damit der Unique-Index greift
+    db.flush()
     token, token_hash = neues_token()
     einladung = Einladung(
         buero_id=buero_id,
@@ -54,7 +62,11 @@ def erstelle_einladung(
         expires_at=jetzt() + EINLADUNG_GUELTIG,
     )
     db.add(einladung)
-    db.commit()
+    try:
+        db.commit()
+    except IntegrityError:  # parallele Anfrage hat gewonnen (Unique-Index)
+        db.rollback()
+        raise EinladungOffenError from None
     link = f"{get_settings().app_base_url.rstrip('/')}/einladung/{token}"
     mail = Mail(
         an=einladung.email,
@@ -65,6 +77,29 @@ def erstelle_einladung(
         ),
     )
     return einladung, mail
+
+
+def sende_einladung_erneut(
+    db: Session, buero_id: uuid.UUID, einladung_id: uuid.UUID
+) -> tuple[Einladung, Mail] | None:
+    """Ersetzt eine nicht eingelöste Einladung durch eine frische (neues Token, neue Frist).
+
+    None, wenn sie nicht existiert, zu einem anderen Büro gehört oder schon eingelöst ist.
+    """
+    alt = db.execute(
+        select(Einladung).where(Einladung.id == einladung_id, Einladung.buero_id == buero_id)
+    ).scalar_one_or_none()
+    if alt is None or alt.used_at is not None:
+        return None
+    email, rolle = alt.email, alt.rolle
+    if alt.revoked_at is None:
+        alt.revoked_at = jetzt()
+        db.flush()
+    try:
+        return erstelle_einladung(db, buero_id, email, rolle)
+    except Exception:
+        db.rollback()  # die alte Einladung bleibt gültig
+        raise
 
 
 def liste_einladungen(db: Session, buero_id: uuid.UUID) -> list[Einladung]:

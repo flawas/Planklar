@@ -1,6 +1,7 @@
 import enum
 import uuid
 from datetime import date, datetime
+from decimal import Decimal
 from typing import Any
 
 from sqlalchemy import (
@@ -13,6 +14,7 @@ from sqlalchemy import (
     ForeignKey,
     Index,
     Integer,
+    Numeric,
     String,
     UniqueConstraint,
     event,
@@ -92,6 +94,7 @@ class Buero(Base):
 
 class User(Base):
     __tablename__ = "user"
+    __table_args__ = (Index("uq_user_email_lower", text("lower(email)"), unique=True),)
 
     id: Mapped[uuid.UUID] = mapped_column(primary_key=True, default=uuid.uuid4)
     buero_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("buero.id"), index=True)
@@ -318,6 +321,15 @@ class Einladung(Base):
     """Einladung eines neuen Benutzers in ein Büro. Das Token wird nur gehasht gespeichert."""
 
     __tablename__ = "einladung"
+    __table_args__ = (
+        Index(
+            "uq_einladung_offen",
+            "buero_id",
+            text("lower(email)"),
+            unique=True,
+            postgresql_where=text("used_at IS NULL AND revoked_at IS NULL"),
+        ),
+    )
 
     id: Mapped[uuid.UUID] = mapped_column(primary_key=True, default=uuid.uuid4)
     buero_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("buero.id"), index=True)
@@ -344,4 +356,26 @@ class PasswortReset(Base):
     token_hash: Mapped[str] = mapped_column(String(64), unique=True)
     expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
     used_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+
+
+class LlmNutzung(Base):
+    """Ein LLM-Aufruf: Token und Kosten für die nutzungsbasierte Abrechnung pro Büro.
+
+    Bewusst ohne Fremdschlüssel auf Prüflauf/Dossier: die Zeilen müssen die Löschung von
+    Dossiers (Retention) überleben. Es werden nie Frage, Bild oder Antwort gespeichert.
+    """
+
+    __tablename__ = "llm_nutzung"
+    __table_args__ = (Index("ix_llm_nutzung_buero_zeit", "buero_id", "created_at"),)
+
+    id: Mapped[uuid.UUID] = mapped_column(primary_key=True, default=uuid.uuid4)
+    buero_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("buero.id"), index=True)
+    pruefung_id: Mapped[uuid.UUID | None] = mapped_column()
+    zweck: Mapped[str] = mapped_column(String(50))  # klassifikation | merkmal | sonstiges
+    modell: Mapped[str] = mapped_column(String(200))
+    input_tokens: Mapped[int] = mapped_column(Integer, default=0, server_default="0")
+    output_tokens: Mapped[int] = mapped_column(Integer, default=0, server_default="0")
+    # Kosten laut Anbieterpreisliste (LiteLLM) zum Aufrufzeitpunkt in USD; NULL = unbekannt
+    kosten_usd: Mapped[Decimal | None] = mapped_column(Numeric(14, 8))
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())

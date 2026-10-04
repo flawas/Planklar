@@ -6,6 +6,7 @@ vorhandenen zu unterscheiden (`NotFoundError`, in der Web-Schicht 404).
 
 import uuid
 from collections.abc import Sequence
+from datetime import UTC, datetime
 from typing import Any
 
 from fastapi import Depends, HTTPException, status
@@ -13,7 +14,7 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.auth.users import current_user
-from app.db.models import Dokument, Dossier, Seite, User
+from app.db.models import Befund, Dokument, Dossier, Ergebnis, Pruefung, Seite, User
 from app.db.session import get_session
 
 
@@ -114,6 +115,79 @@ class BueroScope:
             setattr(seite, key, value)
         self.session.flush()
         return seite
+
+    # Prüflauf
+    def list_pruefungen(self, dossier_id: uuid.UUID) -> Sequence[Pruefung]:
+        self.get_dossier(dossier_id)
+        stmt = select(Pruefung).where(Pruefung.dossier_id == dossier_id)
+        return self.session.scalars(stmt.order_by(Pruefung.gestartet_am)).all()
+
+    def get_pruefung(self, pruefung_id: uuid.UUID) -> Pruefung:
+        stmt = (
+            select(Pruefung)
+            .join(Dossier, Pruefung.dossier_id == Dossier.id)
+            .where(Pruefung.id == pruefung_id, Dossier.buero_id == self.buero_id)
+        )
+        pruefung = self.session.scalars(stmt).one_or_none()
+        if pruefung is None:
+            raise NotFoundError
+        return pruefung
+
+    def add_pruefung(
+        self, dossier_id: uuid.UUID, *, regelset_hash: str, modellversion: str
+    ) -> Pruefung:
+        """Startet einen Prüflauf; Regelset-Hash und Modellversion sind Pflicht."""
+        self.get_dossier(dossier_id)
+        pruefung = Pruefung(
+            dossier_id=dossier_id, regelset_hash=regelset_hash, modellversion=modellversion
+        )
+        self.session.add(pruefung)
+        self.session.flush()
+        return pruefung
+
+    # Befund
+    def list_befunde(self, pruefung_id: uuid.UUID) -> Sequence[Befund]:
+        self.get_pruefung(pruefung_id)
+        stmt = select(Befund).where(Befund.pruefung_id == pruefung_id).order_by(Befund.regel_id)
+        return self.session.scalars(stmt).all()
+
+    def get_befund(self, befund_id: uuid.UUID) -> Befund:
+        stmt = (
+            select(Befund)
+            .join(Pruefung, Befund.pruefung_id == Pruefung.id)
+            .join(Dossier, Pruefung.dossier_id == Dossier.id)
+            .where(Befund.id == befund_id, Dossier.buero_id == self.buero_id)
+        )
+        befund = self.session.scalars(stmt).one_or_none()
+        if befund is None:
+            raise NotFoundError
+        return befund
+
+    def add_befund(
+        self,
+        pruefung_id: uuid.UUID,
+        *,
+        regel_id: str,
+        ergebnis: Ergebnis,
+        belege: list[str] | None = None,
+    ) -> Befund:
+        self.get_pruefung(pruefung_id)
+        befund = Befund(
+            pruefung_id=pruefung_id, regel_id=regel_id, ergebnis=ergebnis, belege=belege or []
+        )
+        self.session.add(befund)
+        self.session.flush()
+        return befund
+
+    def set_override(self, befund_id: uuid.UUID, ergebnis: Ergebnis, begruendung: str) -> Befund:
+        if not begruendung.strip():
+            raise ValueError("Override braucht eine Begründung")
+        befund = self.get_befund(befund_id)
+        befund.override_ergebnis = ergebnis
+        befund.override_begruendung = begruendung.strip()
+        befund.override_am = datetime.now(UTC)
+        self.session.flush()
+        return befund
 
 
 def get_scope(

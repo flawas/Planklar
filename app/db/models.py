@@ -5,6 +5,7 @@ from typing import Any
 
 from sqlalchemy import (
     Boolean,
+    CheckConstraint,
     Date,
     DateTime,
     Enum,
@@ -38,6 +39,19 @@ class Dossierstatus(enum.StrEnum):
     ENTWURF = "entwurf"
     IN_PRUEFUNG = "in_pruefung"
     GEPRUEFT = "geprueft"
+
+
+class Pruefstatus(enum.StrEnum):
+    LAEUFT = "laeuft"
+    ABGESCHLOSSEN = "abgeschlossen"
+    FEHLGESCHLAGEN = "fehlgeschlagen"
+
+
+class Ergebnis(enum.StrEnum):
+    ERFUELLT = "erfüllt"
+    FEHLT = "fehlt"
+    UNSICHER = "unsicher"
+    MANUELL = "manuell"
 
 
 def _enum(cls: type[enum.StrEnum], name: str) -> Enum:
@@ -175,3 +189,50 @@ class Regel(Base):
     stand: Mapped[date] = mapped_column(Date)
 
     regelset: Mapped[Regelset] = relationship(back_populates="regeln")
+
+
+class Pruefung(Base):
+    """Prüflauf: hält Regelset-Hash und Modellversion fest, damit der Bericht reproduzierbar ist."""
+
+    __tablename__ = "pruefung"
+
+    id: Mapped[uuid.UUID] = mapped_column(primary_key=True, default=uuid.uuid4)
+    dossier_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("dossier.id"), index=True)
+    regelset_hash: Mapped[str] = mapped_column(String(64))
+    modellversion: Mapped[str] = mapped_column(String(200))
+    status: Mapped[Pruefstatus] = mapped_column(
+        _enum(Pruefstatus, "pruefstatus"),
+        default=Pruefstatus.LAEUFT,
+        server_default=Pruefstatus.LAEUFT.value,
+    )
+    gestartet_am: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now()
+    )
+    beendet_am: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+
+    dossier: Mapped[Dossier] = relationship()
+    befunde: Mapped[list["Befund"]] = relationship(
+        back_populates="pruefung", cascade="all, delete-orphan", order_by="Befund.regel_id"
+    )
+
+
+class Befund(Base):
+    __tablename__ = "befund"
+    __table_args__ = (
+        UniqueConstraint("pruefung_id", "regel_id"),
+        CheckConstraint(
+            "override_ergebnis IS NULL OR length(btrim(coalesce(override_begruendung, ''))) > 0",
+            name="override_braucht_begruendung",
+        ),
+    )
+
+    id: Mapped[uuid.UUID] = mapped_column(primary_key=True, default=uuid.uuid4)
+    pruefung_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("pruefung.id"), index=True)
+    regel_id: Mapped[str] = mapped_column(String(200))
+    ergebnis: Mapped[Ergebnis] = mapped_column(_enum(Ergebnis, "ergebnis"))
+    belege: Mapped[list[str]] = mapped_column(JSONB, default=list, server_default="[]")
+    override_ergebnis: Mapped[Ergebnis | None] = mapped_column(_enum(Ergebnis, "override_ergebnis"))
+    override_begruendung: Mapped[str | None] = mapped_column(String(2000))
+    override_am: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+
+    pruefung: Mapped[Pruefung] = relationship(back_populates="befunde")

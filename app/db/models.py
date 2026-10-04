@@ -1,18 +1,21 @@
 import enum
 import uuid
-from datetime import datetime
+from datetime import date, datetime
 from typing import Any
 
 from sqlalchemy import (
     Boolean,
+    Date,
     DateTime,
     Enum,
     Float,
     ForeignKey,
+    Index,
     Integer,
     String,
     UniqueConstraint,
     func,
+    text,
 )
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import Mapped, mapped_column, relationship
@@ -128,3 +131,47 @@ class Seite(Base):
     merkmale: Mapped[dict[str, Any]] = mapped_column(JSONB, default=dict, server_default="{}")
 
     dokument: Mapped[Dokument] = relationship(back_populates="seiten")
+
+
+class Regelset(Base):
+    """Geladener Regelset-Stand für (Kanton, Gemeinde); `gemeinde` NULL = reines Kantonsset."""
+
+    __tablename__ = "regelset"
+    __table_args__ = (
+        Index(
+            "uq_regelset_scope_hash",
+            "kanton",
+            text("coalesce(gemeinde, '')"),
+            "regelset_hash",
+            unique=True,
+        ),
+    )
+
+    id: Mapped[uuid.UUID] = mapped_column(primary_key=True, default=uuid.uuid4)
+    kanton: Mapped[Kanton] = mapped_column(_enum(Kanton, "kanton"))
+    gemeinde: Mapped[str | None] = mapped_column(String(200))
+    git_commit: Mapped[str] = mapped_column(String(100))
+    regelset_hash: Mapped[str] = mapped_column(String(64))
+    geladen_am: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+
+    regeln: Mapped[list["Regel"]] = relationship(
+        back_populates="regelset", cascade="all, delete-orphan", order_by="Regel.regel_id"
+    )
+
+
+class Regel(Base):
+    __tablename__ = "regel"
+    __table_args__ = (UniqueConstraint("regelset_id", "regel_id"),)
+
+    id: Mapped[uuid.UUID] = mapped_column(primary_key=True, default=uuid.uuid4)
+    regelset_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("regelset.id"), index=True)
+    regel_id: Mapped[str] = mapped_column(String(200))
+    titel: Mapped[str] = mapped_column(String(500))
+    pruefmethode: Mapped[str] = mapped_column(String(50))
+    schwere: Mapped[str] = mapped_column(String(50))
+    bedingung: Mapped[Any] = mapped_column(JSONB)
+    anforderung: Mapped[dict[str, Any]] = mapped_column(JSONB)
+    quelle: Mapped[dict[str, Any]] = mapped_column(JSONB)
+    stand: Mapped[date] = mapped_column(Date)
+
+    regelset: Mapped[Regelset] = relationship(back_populates="regeln")

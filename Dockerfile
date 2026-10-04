@@ -1,5 +1,5 @@
 # syntax=docker/dockerfile:1
-# Ein Image für web und worker; der Startbefehl wird von Compose gesetzt.
+# Ein Image für web und worker; Compose setzt den Startbefehl (web migriert vor uvicorn, worker nicht).
 
 FROM python:3.12-slim AS builder
 
@@ -40,10 +40,16 @@ COPY --chown=liquet:liquet app ./app
 # Regelkatalog im Image, damit Image-Tag und Regelstand zusammenpassen; per Volume überschreibbar.
 COPY --chown=liquet:liquet rules ./rules
 
+# Git-Commit des Builds (--build-arg GIT_COMMIT=...), wird mit dem Regelset gespeichert.
+ARG GIT_COMMIT=unbekannt
+ENV GIT_COMMIT=$GIT_COMMIT
+
 USER liquet
 EXPOSE 8000
 
 HEALTHCHECK --interval=30s --timeout=5s --start-period=10s --retries=3 \
     CMD ["python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/health', timeout=3)"]
 
-CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000"]
+# Migrationen vor dem Start, da das Lifespan den Regelkatalog in die DB schreibt (Tabellen müssen existieren).
+# Der Worker setzt seinen eigenen Startbefehl und migriert nicht.
+CMD ["sh", "-c", "alembic upgrade head && exec uvicorn app.main:app --host 0.0.0.0 --port 8000"]

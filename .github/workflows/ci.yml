@@ -88,7 +88,10 @@ jobs:
     steps:
       - uses: actions/checkout@v7
       - name: Stack hochfahren
-        run: docker compose up -d --build --wait --wait-timeout 300
+        # Der Worker hat bewusst keinen Healthcheck; --wait ohne Dienstliste würde daran scheitern.
+        run: |
+          docker compose up -d --build
+          docker compose up -d --wait --wait-timeout 300 web db redis s3
       - name: Health prüfen
         run: |
           port="$(docker compose port web 8000 2>/dev/null | cut -d: -f2 || true)"

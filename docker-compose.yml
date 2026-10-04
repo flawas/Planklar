@@ -2,7 +2,10 @@
 # Web: http://localhost:8000 (GET /health), S3-API: http://localhost:8333
 
 x-app: &app
-  build: .
+  build:
+    context: .
+    args:
+      GIT_COMMIT: ${GIT_COMMIT:-unbekannt}
   image: liquet:dev
   environment:
     DATABASE_URL: postgresql+psycopg://liquet:liquet@db:5432/liquet
@@ -23,7 +26,8 @@ x-app: &app
 services:
   web:
     <<: *app
-    # Migrationen vor dem Start; schlägt `alembic upgrade head` fehl, startet uvicorn nicht.
+    # Migrationen vor dem Start (das Lifespan schreibt den Regelkatalog in die DB);
+    # schlägt `alembic upgrade head` fehl, startet uvicorn nicht.
     command:
       - sh
       - -c

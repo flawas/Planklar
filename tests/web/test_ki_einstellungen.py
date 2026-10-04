@@ -111,3 +111,15 @@ def test_unlesbarer_key_wird_angezeigt(client: TestClient, db: Session, admin: s
     db.commit()
     r = client.get(URL)
     assert "nicht mehr lesbar" in r.text and "Hinterlegt" not in r.text
+
+
+def test_verbindungstest_zeigt_fehlertyp(monkeypatch: pytest.MonkeyPatch) -> None:
+    from app.web import ki_einstellungen
+
+    def boom(*args: object, **kwargs: object) -> None:
+        raise llm.LLMError("LLM-Aufruf fehlgeschlagen (AuthenticationError)")
+
+    monkeypatch.setattr(ki_einstellungen, "ask", boom)
+    ok, meldung = ki_einstellungen.verbindung_testen()
+    assert not ok
+    assert "AuthenticationError" in meldung

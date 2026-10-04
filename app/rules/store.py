@@ -42,7 +42,7 @@ def lade_katalog(session: Session, git_commit: str, root: Path = DEFAULT_ROOT) -
     Bei unverändertem Hash bleibt der bereits gespeicherte `git_commit` bewusst unverändert.
     """
     sets = _scopes(root)  # Fehler vor jeglichem DB-Zugriff
-    session.execute(text("SELECT pg_advisory_xact_lock(hashtext('planklar_regelset_laden'))"))
+    session.execute(text("SELECT pg_advisory_xact_lock(hashtext('liquet_regelset_laden'))"))
     neu: list[db.Regelset] = []
     for rs in sets:
         if _existiert(session, rs.kanton, rs.gemeinde, rs.hash):

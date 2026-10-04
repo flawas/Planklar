@@ -1,5 +1,6 @@
 # Lokale Entwicklung: docker compose up -d --build
-# Web: http://localhost:8000 (GET /health), S3-API: http://localhost:8333
+# Proxy: http://localhost:8080 (GET /health), Web direkt: http://localhost:8000, S3-API: http://localhost:8333
+# Konfiguration: .env.example nach .env kopieren (optional, alle Werte haben Entwicklungs-Defaults).
 
 x-app: &app
   build:
@@ -24,6 +25,22 @@ x-app: &app
   restart: unless-stopped
 
 services:
+  proxy:
+    image: caddy:2.11.6-alpine
+    ports:
+      - "${PROXY_HTTP_PORT:-8080}:80"
+      - "${PROXY_HTTPS_PORT:-8443}:443"
+    environment:
+      # Lokal :80 (ohne TLS); in Produktion der Hostname, dann holt Caddy das Zertifikat automatisch.
+      SITE_ADDRESS: ${SITE_ADDRESS:-:80}
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy-data:/data
+    depends_on:
+      web:
+        condition: service_healthy
+    restart: unless-stopped
+
   web:
     <<: *app
     # Migrationen vor dem Start (das Lifespan schreibt den Regelkatalog in die DB);
@@ -33,7 +50,7 @@ services:
       - -c
       - alembic upgrade head && exec uvicorn app.main:app --host 0.0.0.0 --port 8000
     ports:
-      - "8000:8000"
+      - "${WEB_PORT:-8000}:8000"
 
   worker:
     <<: *app
@@ -71,7 +88,7 @@ services:
     restart: unless-stopped
 
   s3:
-    image: chrislusf/seaweedfs:latest
+    image: chrislusf/seaweedfs:4.20
     command: ["server", "-dir=/data", "-s3"]
     ports:
       - "8333:8333"
@@ -80,5 +97,6 @@ services:
     restart: unless-stopped
 
 volumes:
+  caddy-data:
   db-data:
   s3-data:

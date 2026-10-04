@@ -5,7 +5,7 @@ Liquet prüft Baugesuche auf formale Vollständigkeit. Ein Einzelentwickler pfle
 
 ## Entscheidung
 - Python 3.12, FastAPI, Jinja2 + HTMX (ein Service für API und UI, kein JS-Build)
-- Celery mit Redis für Prüfläufe; PostgreSQL 16 (JSONB); MinIO (S3-kompatibel)
+- Celery mit Redis für Prüfläufe; PostgreSQL 16 (JSONB); MinIO (S3-kompatibel; seit ADR 0003 SeaweedFS)
 - PyMuPDF, Tesseract (deu) als OCR-Fallback
 - LiteLLM mit Vision-Modell und strukturiertem JSON-Output
 - Eigene Regelengine mit JSON Logic (json-logic-py); Regelkatalog als YAML mit JSON-Schema

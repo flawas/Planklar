@@ -23,6 +23,14 @@ x-app: &app
     RETENTION_DAYS: ${RETENTION_DAYS:-30}
     AUTH_SECRET: ${AUTH_SECRET:-dev-only-change-me}
     AUTH_COOKIE_SECURE: ${AUTH_COOKIE_SECURE:-false}
+    # E-Mail (SMTP, anbieterneutral); ohne SMTP_HOST wird nicht versendet (Einladung, Passwort-Reset)
+    SMTP_HOST: ${SMTP_HOST:-}
+    SMTP_PORT: ${SMTP_PORT:-587}
+    SMTP_USER: ${SMTP_USER:-}
+    SMTP_PASSWORD: ${SMTP_PASSWORD:-}
+    SMTP_STARTTLS: ${SMTP_STARTTLS:-true}
+    MAIL_FROM: ${MAIL_FROM:-}
+    APP_BASE_URL: ${APP_BASE_URL:-http://localhost:8080}
   depends_on:
     db:
       condition: service_healthy

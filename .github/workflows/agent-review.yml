@@ -104,7 +104,15 @@ jobs:
             (`gh pr view ${{ github.event.pull_request.number }} --comments`) und behebe alle `blocker` und `should`.
             Tests und Lint lokal grün machen. Commit-Nachricht muss mit `fix(review):` beginnen. Pushen.
             Danach Label `review:changes-requested` vom PR entfernen. Keine neuen Features.
+            Pushe mit `git push origin HEAD`; das anschliessende Anstossen von CI und Review übernimmt der Workflow.
           claude_args: |
             --model claude-sonnet-5-5
             --max-turns 50
             --allowedTools "Read,Write,Edit,Glob,Grep,Bash"
+
+      - name: CI und Review anstossen
+        if: steps.ctx.outputs.stop != 'true'
+        env:
+          GH_TOKEN: ${{ env.AGENT_PAT }}
+          GH_REPO: ${{ github.repository }}
+        run: bash .github/scripts/ensure-ci.sh '${{ github.event.pull_request.head.ref }}'

@@ -16,3 +16,10 @@ button { padding: .5rem 1rem; border: 0; border-radius: 4px; background: var(--a
 :focus-visible { outline: 3px solid #f5a623; outline-offset: 2px; }
 .fehler { color: var(--fehler); border-left: 4px solid var(--fehler); padding: .5rem .75rem;
   background: #fdf0f0; }
+.fortschritt { width: 100%; }
+.ergebnisse { list-style: none; padding: 0; }
+.ergebnisse li { padding: .5rem .75rem; margin-bottom: .25rem; border-left: 4px solid #1b6e3c; background: #eef8f1; }
+.ergebnisse li.fehler { border-left-color: var(--fehler); background: #fdf0f0; }
+.liste { width: 100%; border-collapse: collapse; }
+.liste th, .liste td { text-align: left; padding: .4rem; border-bottom: 1px solid var(--rand); }
+.nur-sr { position: absolute; left: -999px; }

@@ -37,6 +37,7 @@ def verbindung_testen() -> tuple[bool, str]:
     """Stellt eine harmlose Testfrage ohne Dokumentinhalt, ohne Fehlerdetails."""
     try:
         ask('Antworte mit {"ok": true}.', _TEST_SCHEMA, text="Verbindungstest")
-    except LLMError:
-        return False, MSG_TEST_FEHLER
+    except LLMError as exc:
+        # Die Meldung enthält nur den Ausnahme-Typ (z. B. AuthenticationError), keine Inhalte.
+        return False, f"{MSG_TEST_FEHLER} ({exc})"
     return True, MSG_TEST_OK

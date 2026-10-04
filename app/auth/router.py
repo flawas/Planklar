@@ -5,10 +5,10 @@ from app.auth.schemas import AdminUserCreate, UserCreate, UserRead
 from app.auth.users import (
     UserManager,
     cookie_backend,
-    current_superuser,
     current_user,
     fastapi_users,
     get_user_manager,
+    require_buero_admin,
 )
 from app.db.models import User
 
@@ -28,7 +28,7 @@ admin_router = APIRouter(prefix="/admin", tags=["admin"])
 @admin_router.post("/users", response_model=UserRead, status_code=status.HTTP_201_CREATED)
 async def create_user(
     payload: AdminUserCreate,
-    admin: User = Depends(current_superuser),
+    admin: User = Depends(require_buero_admin),
     manager: UserManager = Depends(get_user_manager),
 ) -> User:
     """Legt einen normalen Benutzer im Büro des Admins an (Mandantentrennung)."""

@@ -4,5 +4,5 @@
 <h1>Willkommen</h1>
 <p>Sie sind angemeldet als {{ user.email }}.</p>
 <p><a href="/vorhaben">Meine Vorhaben</a> · <a href="/vorhaben/neu">Neues Vorhaben erfassen</a></p>
-{% if user.is_superuser %}<p><a href="/einstellungen/ki">KI-Einstellungen</a></p>{% endif %}
+{% if user.is_plattform_admin %}<p><a href="/einstellungen/ki">KI-Einstellungen</a></p>{% endif %}
 {% endblock %}

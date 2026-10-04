@@ -12,6 +12,7 @@ from sqlalchemy.orm import Session
 from app.auth.users import (
     COOKIE_NAME,
     UserManager,
+    buero_ist_aktiv,
     cookie_backend,
     get_user_manager,
 )
@@ -45,6 +46,7 @@ MSG_UPLOAD = {
 MSG_KEINE_DATEI = "Bitte wählen Sie mindestens eine Datei aus."
 MSG_SCHRITT = "Ungültiger Schritt im Assistenten."
 MSG_NOT_LOGGED_IN = "Bitte melden Sie sich an."
+MSG_FORBIDDEN = "Dafür fehlt Ihnen die Berechtigung."
 MSG_GESPEICHERT = "Einstellungen gespeichert."
 
 
@@ -96,7 +98,7 @@ async def _optional_user(
     if not token:
         return None
     user = await cookie_backend.get_strategy().read_token(token, manager)
-    return user if user and user.is_active else None
+    return user if user and user.is_active and buero_ist_aktiv(user) else None
 
 
 @web_router.get("/", response_model=None)
@@ -364,8 +366,8 @@ def ki_einstellungen_form(
 ) -> Response:
     if user is None:
         return RedirectResponse("/login", status.HTTP_303_SEE_OTHER)
-    if not user.is_superuser:
-        return _render(request, "nicht_gefunden.html", user=user, status_code=404)
+    if not user.is_plattform_admin:
+        return _render(request, "_fehler.html", user=user, status_code=403, error=MSG_FORBIDDEN)
     return _ki_seite(request, user, session)
 
 
@@ -382,8 +384,8 @@ def ki_einstellungen_speichern(
 ) -> Response:
     if user is None:
         return _render(request, "_fehler.html", status_code=401, error=MSG_NOT_LOGGED_IN)
-    if not user.is_superuser:
-        return _render(request, "nicht_gefunden.html", user=user, status_code=404)
+    if not user.is_plattform_admin:
+        return _render(request, "_fehler.html", user=user, status_code=403, error=MSG_FORBIDDEN)
     if not csrf.matches(request.cookies.get(csrf.CSRF_COOKIE), csrf_token):
         return _render(request, "_fehler.html", user=user, status_code=403, error=MSG_CSRF)
     werte = {"modell": modell.strip(), "api_base": api_base.strip()}
@@ -409,8 +411,8 @@ def ki_verbindung_testen(
 ) -> Response:
     if user is None:
         return _render(request, "_fehler.html", status_code=401, error=MSG_NOT_LOGGED_IN)
-    if not user.is_superuser:
-        return _render(request, "nicht_gefunden.html", user=user, status_code=404)
+    if not user.is_plattform_admin:
+        return _render(request, "_fehler.html", user=user, status_code=403, error=MSG_FORBIDDEN)
     if not csrf.matches(request.cookies.get(csrf.CSRF_COOKIE), csrf_token):
         return _render(request, "_fehler.html", user=user, status_code=403, error=MSG_CSRF)
     if not llm_config.load_config(session).model:

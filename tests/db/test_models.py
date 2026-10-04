@@ -199,3 +199,32 @@ def test_befund_pro_regel_und_pruefung_eindeutig(session: Session) -> None:
         pruefung.befunde.append(Befund(regel_id="lu.r1", ergebnis=Ergebnis.FEHLT))
     with pytest.raises(IntegrityError):
         session.commit()
+
+
+def test_migration_0009_bestehende_konten(engine: Engine, monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv("PLATTFORM_ADMINS", "Chef@x.ch")
+    cfg = Config("alembic.ini")
+    with engine.begin() as conn:
+        cfg.attributes["connection"] = conn
+        command.upgrade(cfg, "0008")
+        bid = uuid.uuid4()
+        conn.execute(text("INSERT INTO buero (id, name) VALUES (:i, 'B')"), {"i": bid})
+        for email, su in [("chef@x.ch", True), ("admin@x.ch", True), ("ma@x.ch", False)]:
+            conn.execute(
+                text(
+                    'INSERT INTO "user" (id, buero_id, email, hashed_password, is_superuser)'
+                    " VALUES (:i, :b, :e, 'x', :s)"
+                ),
+                {"i": uuid.uuid4(), "b": bid, "e": email, "s": su},
+            )
+        command.upgrade(cfg, "head")
+        rows = conn.execute(
+            text('SELECT email, rolle, is_plattform_admin, is_active FROM "user" ORDER BY email')
+        ).all()
+        assert rows == [
+            ("admin@x.ch", "buero_admin", False, True),
+            ("chef@x.ch", "buero_admin", True, True),
+            ("ma@x.ch", "mitarbeiter", False, True),
+        ]
+        assert conn.execute(text("SELECT aktiv FROM buero")).scalar() is True
+        command.downgrade(cfg, "0008")

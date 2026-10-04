@@ -1,4 +1,5 @@
 import uuid
+from datetime import UTC, datetime
 
 from fastapi import APIRouter, Depends, HTTPException, UploadFile, status
 from fastapi.exceptions import RequestValidationError
@@ -10,7 +11,7 @@ from app.config import get_settings
 from app.db.models import Befund, Dokument, Dossier, Pruefstatus, Pruefung, User
 from app.db.session import get_session
 from app.dossiers.erwartung import ErwarteteUnterlagen, erwartete_unterlagen
-from app.dossiers.pruefung import start_pruefung
+from app.dossiers.pruefung import LEASE, start_pruefung
 from app.dossiers.schemas import (
     BefundRead,
     DokumentRead,
@@ -130,13 +131,23 @@ def start_pruefung_endpoint(
     try:
         if not scope.list_dokumente(dossier_id):
             raise HTTPException(status.HTTP_422_UNPROCESSABLE_CONTENT, "KEINE_DOKUMENTE")
-        if any(p.status == Pruefstatus.LAEUFT for p in scope.list_pruefungen(dossier_id)):
+        scope.lock_dossier(dossier_id)  # serialisiert gleichzeitige Starts
+        if scope.hat_aktiven_lauf(dossier_id, LEASE):
             raise HTTPException(status.HTTP_409_CONFLICT, "PRUEFUNG_LAEUFT")
         pruefung = start_pruefung(scope, dossier_id)
     except NotFoundError:
         raise not_found() from None
     scope.session.commit()
-    run_pruefung_task.delay(str(scope.buero_id), str(pruefung.id))
+    try:
+        run_pruefung_task.delay(str(scope.buero_id), str(pruefung.id))
+    except Exception:
+        scope.update_pruefung(
+            pruefung.id, status=Pruefstatus.FEHLGESCHLAGEN, beendet_am=datetime.now(UTC)
+        )
+        scope.session.commit()
+        raise HTTPException(
+            status.HTTP_503_SERVICE_UNAVAILABLE, "WORKER_NICHT_ERREICHBAR"
+        ) from None
     return pruefung
 
 

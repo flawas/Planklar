@@ -1,10 +1,12 @@
 import uuid
+from datetime import UTC, datetime, timedelta
 
 import pytest
 from fastapi.testclient import TestClient
 from sqlalchemy.orm import Session
 
 from app.db.models import Ergebnis, Pruefstatus
+from app.dossiers.pruefung import LEASE
 from app.dossiers.scope import BueroScope
 from app.storage import Storage
 from tests.auth.conftest import make_user
@@ -96,6 +98,52 @@ def test_laufender_pruefung_kein_zweiter_start(
     assert second.json()["detail"] == "PRUEFUNG_LAEUFT"
     assert len(enqueued) == 1
     assert first.status_code == 202
+
+
+def test_broker_ausfall_setzt_lauf_fehlgeschlagen_und_503(
+    client: TestClient, db: Session, storage: Storage, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    def kaputt(buero_id: str, pruefung_id: str) -> None:
+        raise ConnectionError
+
+    monkeypatch.setattr("app.dossiers.router.run_pruefung_task.delay", kaputt)
+    did = _dossier(client, db)
+    _upload(client, did)
+    r = client.post(f"/dossiers/{did}/pruefungen")
+    assert r.status_code == 503
+    assert r.json()["detail"] == "WORKER_NICHT_ERREICHBAR"
+    laeufe = client.get(f"/dossiers/{did}/pruefungen").json()
+    assert [p["status"] for p in laeufe] == ["fehlgeschlagen"]
+    assert laeufe[0]["beendet_am"] is not None
+
+
+def test_verwaister_lauf_blockiert_neustart_nicht(
+    client: TestClient, db: Session, storage: Storage, enqueued: list[tuple[str, str]]
+) -> None:
+    did = _dossier(client, db)
+    _upload(client, did)
+    alt = client.post(f"/dossiers/{did}/pruefungen").json()["id"]
+    scope = BueroScope(db, uuid.UUID(enqueued[0][0]))
+    scope.update_pruefung(uuid.UUID(alt), lauf_bis=datetime.now(UTC) - timedelta(minutes=1))
+    db.commit()
+    r = client.post(f"/dossiers/{did}/pruefungen")
+    assert r.status_code == 202
+    assert len(enqueued) == 2
+    assert client.get(f"/dossiers/{did}/pruefungen/{alt}").json()["status"] == "fehlgeschlagen"
+
+
+def test_nie_geclaimter_alter_lauf_blockiert_nicht(
+    client: TestClient, db: Session, storage: Storage, enqueued: list[tuple[str, str]]
+) -> None:
+    did = _dossier(client, db)
+    _upload(client, did)
+    alt = client.post(f"/dossiers/{did}/pruefungen").json()["id"]
+    scope = BueroScope(db, uuid.UUID(enqueued[0][0]))
+    scope.update_pruefung(
+        uuid.UUID(alt), gestartet_am=datetime.now(UTC) - LEASE - timedelta(minutes=1)
+    )
+    db.commit()
+    assert client.post(f"/dossiers/{did}/pruefungen").status_code == 202
 
 
 def test_fremdes_buero_bekommt_404(

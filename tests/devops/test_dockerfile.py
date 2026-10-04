@@ -9,7 +9,7 @@ def test_multi_stage_on_python_slim() -> None:
 
 
 def test_runs_as_non_root() -> None:
-    assert "USER planklar" in DOCKERFILE
+    assert "USER liquet" in DOCKERFILE
 
 
 def test_runtime_has_ocr_and_weasyprint_libs() -> None:
@@ -18,7 +18,7 @@ def test_runtime_has_ocr_and_weasyprint_libs() -> None:
 
 
 def test_rules_copied_into_image() -> None:
-    assert "COPY --chown=planklar:planklar rules ./rules" in DOCKERFILE
+    assert "COPY --chown=liquet:liquet rules ./rules" in DOCKERFILE
     assert (ROOT / "rules").is_dir()
 
 

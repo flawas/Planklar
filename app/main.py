@@ -24,7 +24,7 @@ async def lifespan(_: FastAPI) -> AsyncIterator[None]:
     yield
 
 
-app = FastAPI(title="Planklar", lifespan=lifespan)
+app = FastAPI(title="Liquet", lifespan=lifespan)
 install_request_logging(app)
 ensure_oidc_disabled(get_settings())
 app.include_router(auth_router)

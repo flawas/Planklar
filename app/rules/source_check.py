@@ -38,7 +38,7 @@ def collect_urls(rules_dir: Path) -> dict[str, list[str]]:
 
 
 def fetch(url: str) -> bytes:
-    req = urllib.request.Request(url, headers={"User-Agent": "planklar-source-check"})
+    req = urllib.request.Request(url, headers={"User-Agent": "liquet-source-check"})
     with urllib.request.urlopen(req, timeout=TIMEOUT_S) as resp:  # noqa: S310 (nur http/https per Schema)
         body: bytes = resp.read()
     return body

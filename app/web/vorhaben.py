@@ -162,9 +162,11 @@ def zu_dossier(werte: dict[str, str]) -> DossierCreate | None:
     modell = ATTRIBUT_MODELLE.get(Vorhabenstyp(typ)) if typ in TYPEN else None
     if modell is None:
         return None
+    if werte.get("verfahren") not in VERFAHREN:
+        return None
     attribute: dict[str, Any] = {"verfahren": werte["verfahren"]}
     for name in BEZUGSFELDER:
-        attribute[name] = werte[name] == "ja"
+        attribute[name] = werte.get(name) == "ja"
     for name in ZAHLFELDER:
         if name in modell.model_fields and werte.get(name):
             attribute[name] = float(werte[name].replace(",", "."))

@@ -135,3 +135,14 @@ def test_abschluss_unvollstaendig_und_csrf(client: TestClient, db: Session) -> N
     assert "Bitte wählen Sie Ja oder Nein." in r.text and "Bitte geben Sie eine Zahl" in r.text
     assert db.scalars(select(Dossier)).all() == []
     assert post(client, "falsch", schritt="1", aktion="weiter", kanton="LU").status_code == 403
+
+
+def test_abschluss_ohne_verfahren_ergibt_422(client: TestClient, db: Session) -> None:
+    tok = start(client, db)
+    r = post(
+        client, tok, schritt="5", aktion="fertig", kanton="LU", gemeinde="Luzern",
+        vorhabenstyp="umbau_anbau", gewaesserbezug="nein", kantonsstrassenbezug="nein",
+        waldbezug="nein", ausserhalb_bauzone="nein",
+    )  # fmt: skip
+    assert r.status_code == 422
+    assert db.scalars(select(Dossier)).all() == []

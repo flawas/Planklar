@@ -1,3 +1,5 @@
+import uuid
+
 import pytest
 from alembic import command
 from alembic.config import Config
@@ -6,11 +8,15 @@ from sqlalchemy.exc import DBAPIError, IntegrityError
 from sqlalchemy.orm import Session
 
 from app.db.models import (
+    Befund,
     Buero,
     Dokument,
     Dossier,
     Dossierstatus,
+    Ergebnis,
     Kanton,
+    Pruefstatus,
+    Pruefung,
     Seite,
     User,
     Vorhabenstyp,
@@ -99,5 +105,97 @@ def test_dokument_doppel_pro_dossier_verhindert(session: Session) -> None:
             Dokument(dateiname=name, sha256="a" * 64, seitenzahl=1, speicherpfad=name)
         )
     session.add(dossier)
+    with pytest.raises(IntegrityError):
+        session.commit()
+
+
+def _pruefung(session: Session, **kw) -> Pruefung:
+    dossier = _dossier(Buero(name="B"))
+    pruefung = Pruefung(
+        dossier=dossier,
+        regelset_hash=kw.pop("regelset_hash", "a" * 64),
+        modellversion=kw.pop("modellversion", "modell-1"),
+        **kw,
+    )
+    session.add(pruefung)
+    session.flush()
+    return pruefung
+
+
+def test_pruefung_speichert_hash_und_modellversion(session: Session) -> None:
+    pruefung = _pruefung(session)
+    session.commit()
+    session.expire_all()
+    p = session.query(Pruefung).one()
+    assert (p.regelset_hash, p.modellversion) == ("a" * 64, "modell-1")
+    assert p.status is Pruefstatus.LAEUFT
+    assert p.gestartet_am is not None
+    assert p.beendet_am is None
+    assert p.id == pruefung.id
+
+
+@pytest.mark.parametrize("feld", ["regelset_hash", "modellversion"])
+def test_pruefung_braucht_hash_und_modellversion(session: Session, feld: str) -> None:
+    dossier = _dossier(Buero(name="B"))
+    felder = {"regelset_hash": "a" * 64, "modellversion": "m"}
+    del felder[feld]
+    session.add(Pruefung(dossier=dossier, **felder))
+    with pytest.raises(IntegrityError):
+        session.commit()
+
+
+def test_befund_mit_belegen_und_override(session: Session) -> None:
+    pruefung = _pruefung(session)
+    seite_id = str(uuid.uuid4())
+    pruefung.befunde.append(
+        Befund(
+            regel_id="lu.r1",
+            ergebnis=Ergebnis.UNSICHER,
+            belege=[seite_id],
+            override_ergebnis=Ergebnis.ERFUELLT,
+            override_begruendung="Planer bestätigt",
+        )
+    )
+    session.commit()
+    session.expire_all()
+    b = session.query(Befund).one()
+    assert b.ergebnis is Ergebnis.UNSICHER
+    assert b.belege == [seite_id]
+    assert b.override_ergebnis is Ergebnis.ERFUELLT
+
+
+def test_befund_ohne_belege_hat_leere_liste(session: Session) -> None:
+    pruefung = _pruefung(session)
+    pruefung.befunde.append(Befund(regel_id="lu.r1", ergebnis=Ergebnis.MANUELL))
+    session.commit()
+    assert session.query(Befund).one().belege == []
+
+
+def test_override_braucht_begruendung(session: Session) -> None:
+    pruefung = _pruefung(session)
+    pruefung.befunde.append(
+        Befund(
+            regel_id="lu.r1",
+            ergebnis=Ergebnis.FEHLT,
+            override_ergebnis=Ergebnis.ERFUELLT,
+            override_begruendung=" ",
+        )
+    )
+    with pytest.raises(IntegrityError):
+        session.commit()
+
+
+def test_befund_ergebnis_nur_vier_werte(session: Session) -> None:
+    pruefung = _pruefung(session)
+    pruefung.befunde.append(Befund(regel_id="lu.r1", ergebnis=Ergebnis.FEHLT))
+    session.commit()
+    with pytest.raises(DBAPIError):
+        session.execute(text("UPDATE befund SET ergebnis = 'ok'"))
+
+
+def test_befund_pro_regel_und_pruefung_eindeutig(session: Session) -> None:
+    pruefung = _pruefung(session)
+    for _ in range(2):
+        pruefung.befunde.append(Befund(regel_id="lu.r1", ergebnis=Ergebnis.FEHLT))
     with pytest.raises(IntegrityError):
         session.commit()

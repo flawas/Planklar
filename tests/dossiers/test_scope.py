@@ -10,7 +10,17 @@ from sqlalchemy import Engine
 from sqlalchemy.orm import Session
 
 from app.db.base import Base
-from app.db.models import Buero, Dokument, Dossier, Kanton, Seite, Vorhabenstyp
+from app.db.models import (
+    Befund,
+    Buero,
+    Dokument,
+    Dossier,
+    Ergebnis,
+    Kanton,
+    Pruefung,
+    Seite,
+    Vorhabenstyp,
+)
 from app.dossiers.scope import BueroScope, NotFoundError, get_scope, not_found
 
 
@@ -22,6 +32,8 @@ class World:
     dossier_id: uuid.UUID
     dokument_id: uuid.UUID
     seite_id: uuid.UUID
+    pruefung_id: uuid.UUID
+    befund_id: uuid.UUID
 
 
 @pytest.fixture
@@ -40,8 +52,10 @@ def world(engine: Engine) -> Iterator[World]:
         )
         seite = Seite(dokument_id=dok.id, nummer=1)
         s.add(seite)
+        pruefung = scope_a.add_pruefung(d.id, regelset_hash="h" * 64, modellversion="m1")
+        befund = scope_a.add_befund(pruefung.id, regel_id="lu.r1", ergebnis=Ergebnis.FEHLT)
         s.commit()
-        yield World(s, scope_a, BueroScope(s, b.id), d.id, dok.id, seite.id)
+        yield World(s, scope_a, BueroScope(s, b.id), d.id, dok.id, seite.id, pruefung.id, befund.id)
 
 
 Op = Callable[[BueroScope, World], Any]
@@ -59,6 +73,17 @@ FREMDZUGRIFF: dict[str, Op] = {
     "list_seiten": lambda sc, w: sc.list_seiten(w.dokument_id),
     "get_seite": lambda sc, w: sc.get_seite(w.seite_id),
     "update_seite": lambda sc, w: sc.update_seite(w.seite_id, plantyp="grundriss"),
+    "list_pruefungen": lambda sc, w: sc.list_pruefungen(w.dossier_id),
+    "get_pruefung": lambda sc, w: sc.get_pruefung(w.pruefung_id),
+    "add_pruefung": lambda sc, w: sc.add_pruefung(
+        w.dossier_id, regelset_hash="x" * 64, modellversion="m"
+    ),
+    "list_befunde": lambda sc, w: sc.list_befunde(w.pruefung_id),
+    "get_befund": lambda sc, w: sc.get_befund(w.befund_id),
+    "add_befund": lambda sc, w: sc.add_befund(
+        w.pruefung_id, regel_id="lu.r2", ergebnis=Ergebnis.ERFUELLT
+    ),
+    "set_override": lambda sc, w: sc.set_override(w.befund_id, Ergebnis.ERFUELLT, "Hack"),
 }
 
 
@@ -70,6 +95,8 @@ def test_buero_b_sieht_und_aendert_nichts_von_buero_a(world: World, name: str) -
     assert world.session.query(Dossier).one().gemeinde == "Luzern"
     assert world.session.query(Dokument).count() == 1
     assert world.session.query(Seite).one().plantyp is None
+    assert world.session.query(Pruefung).count() == 1
+    assert world.session.get_one(Befund, world.befund_id).override_ergebnis is None
 
 
 def test_eigenes_buero_hat_zugriff(world: World) -> None:
@@ -116,3 +143,17 @@ def test_dependency_liefert_scope_des_users_und_404(world: World) -> None:
     for scope, expected in ((world.a, 200), (world.b, 404)):
         app.dependency_overrides[get_scope] = _constant(scope)
         assert TestClient(app).get(f"/d/{world.dossier_id}").status_code == expected
+
+
+def test_eigenes_buero_pruefung_und_override(world: World) -> None:
+    assert [p.id for p in world.a.list_pruefungen(world.dossier_id)] == [world.pruefung_id]
+    assert [b.id for b in world.a.list_befunde(world.pruefung_id)] == [world.befund_id]
+    befund = world.a.set_override(world.befund_id, Ergebnis.ERFUELLT, " Beleg liegt vor ")
+    assert befund.override_begruendung == "Beleg liegt vor"
+    assert befund.override_am is not None
+    assert befund.ergebnis is Ergebnis.FEHLT
+
+
+def test_override_ohne_begruendung_abgelehnt(world: World) -> None:
+    with pytest.raises(ValueError):
+        world.a.set_override(world.befund_id, Ergebnis.ERFUELLT, "  ")

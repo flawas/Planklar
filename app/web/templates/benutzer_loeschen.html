@@ -1,0 +1,12 @@
+{% from "_icons.html" import icon %}
+{% extends "base.html" %}
+{% block title %}Benutzer löschen{% endblock %}
+{% block content %}
+<h1>Benutzer löschen</h1>
+<p>Soll das Konto <strong>{{ ziel.email }}</strong> endgültig gelöscht werden? Das lässt sich nicht rückgängig machen.</p>
+<form method="post" action="/benutzer/{{ ziel.id }}/loeschen" class="formular">
+  <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+  <button type="submit">Endgültig löschen</button>
+  <a class="btn text" href="/benutzer">Abbrechen</a>
+</form>
+{% endblock %}

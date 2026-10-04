@@ -18,6 +18,7 @@
     <nav class="navi" aria-label="Hauptnavigation">
       <a class="btn text" href="/vorhaben">{{ icon("folder_open") }}Vorhaben</a>
       <a class="btn text" href="/vorhaben/neu">{{ icon("add") }}Neu</a>
+      {% if user.rolle.value == "buero_admin" %}<a class="btn text" href="/benutzer">{{ icon("settings") }}Benutzer</a>{% endif %}
       {% if user.is_plattform_admin %}<a class="btn text" href="/plattform">{{ icon("settings") }}Büros</a>
       <a class="btn text" href="/einstellungen/ki">{{ icon("settings") }}KI</a>{% endif %}
       <form method="post" action="/logout" class="abmelden">

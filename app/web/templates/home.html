@@ -1,6 +1,5 @@
 {% extends "base.html" %}
-{% block title %}Start{% if user.is_superuser %}<p><a href="/einstellungen/ki">KI-Einstellungen</a></p>{% endif %}
-{% endblock %}
+{% block title %}Start{% endblock %}
 {% block content %}
 <h1>Willkommen</h1>
 <p>Sie sind angemeldet als {{ user.email }}.</p>

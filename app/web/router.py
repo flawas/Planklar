@@ -3,12 +3,25 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Annotated
 
-from fastapi import APIRouter, Depends, File, Form, HTTPException, Request, UploadFile, status
+from fastapi import (
+    APIRouter,
+    BackgroundTasks,
+    Depends,
+    File,
+    Form,
+    HTTPException,
+    Request,
+    UploadFile,
+    status,
+)
 from fastapi.responses import HTMLResponse, RedirectResponse, Response
 from fastapi.security import OAuth2PasswordRequestForm
 from fastapi.templating import Jinja2Templates
+from pydantic import EmailStr, TypeAdapter, ValidationError
 from sqlalchemy.orm import Session
 
+from app.auth import einladung as einladung_svc
+from app.auth import plattform
 from app.auth.users import (
     COOKIE_NAME,
     LoginGesperrtError,
@@ -24,6 +37,7 @@ from app.dossiers.pruefung import LEASE
 from app.dossiers.router import start_pruefung_endpoint
 from app.dossiers.scope import BueroScope, NotFoundError
 from app.dossiers.service import UploadError, basename, get_storage, upload_dokument
+from app.mail import Mailer, get_mailer, send_safely
 from app.pipeline import llm_config
 from app.reports import bericht as berichte
 from app.reports.pdf import render_pdf
@@ -50,6 +64,11 @@ MSG_SCHRITT = "Ungültiger Schritt im Assistenten."
 MSG_NOT_LOGGED_IN = "Bitte melden Sie sich an."
 MSG_FORBIDDEN = "Dafür fehlt Ihnen die Berechtigung."
 MSG_GESPEICHERT = "Einstellungen gespeichert."
+MSG_BUERO_ANGELEGT = "Büro angelegt. Die Einladung an den ersten Administrator wurde versandt."
+MSG_BUERO_EMAIL = "Diese E-Mail-Adresse hat bereits ein Konto."
+MSG_BUERO_MAIL_UNGUELTIG = "Bitte geben Sie eine gültige E-Mail-Adresse an."
+MSG_BUERO_NAME = "Bitte geben Sie einen Namen (max. 200 Zeichen) an."
+MSG_BUERO_UNBEKANNT = "Büro nicht gefunden."
 
 
 @dataclass
@@ -470,6 +489,145 @@ def ki_verbindung_testen(
         )
     ok, meldung = ki_einstellungen.verbindung_testen()
     return _ki_seite(request, user, session, meldung=meldung, ok=ok)
+
+
+def _plattform_seite(
+    request: Request,
+    user: User,
+    session: Session,
+    *,
+    meldung: str | None = None,
+    ok: bool = True,
+    werte: dict[str, str] | None = None,
+    status_code: int = 200,
+) -> Response:
+    return _render(
+        request,
+        "plattform.html",
+        user=user,
+        status_code=status_code,
+        bueros=plattform.liste_bueros(session),
+        meldung=meldung,
+        ok=ok,
+        werte=werte or {"name": "", "admin_email": ""},
+    )
+
+
+def _plattform_pruefen(
+    request: Request, user: User | None, csrf_token: str
+) -> tuple[User | None, Response | None]:
+    """Gemeinsame Zugriffsprüfung der Plattform-Aktionen (POST)."""
+    if user is None:
+        return None, _render(request, "_fehler.html", status_code=401, error=MSG_NOT_LOGGED_IN)
+    if not user.is_plattform_admin:
+        return None, _render(
+            request, "_fehler.html", user=user, status_code=403, error=MSG_FORBIDDEN
+        )
+    if csrf_token is not None and not csrf.matches(
+        request.cookies.get(csrf.CSRF_COOKIE), csrf_token
+    ):
+        return None, _render(request, "_fehler.html", user=user, status_code=403, error=MSG_CSRF)
+    return user, None
+
+
+@web_router.get("/plattform", response_model=None)
+def plattform_uebersicht(
+    request: Request,
+    user: Annotated[User | None, Depends(_optional_user)],
+    session: Session = Depends(get_session),
+) -> Response:
+    if user is None:
+        return RedirectResponse("/login", status.HTTP_303_SEE_OTHER)
+    if not user.is_plattform_admin:
+        return _render(request, "_fehler.html", user=user, status_code=403, error=MSG_FORBIDDEN)
+    return _plattform_seite(request, user, session)
+
+
+@web_router.post("/plattform/neu", response_model=None)
+def plattform_buero_anlegen(
+    request: Request,
+    background: BackgroundTasks,
+    user: Annotated[User | None, Depends(_optional_user)],
+    name: Annotated[str, Form()] = "",
+    admin_email: Annotated[str, Form()] = "",
+    csrf_token: Annotated[str, Form()] = "",
+    session: Session = Depends(get_session),
+    mailer: Mailer = Depends(get_mailer),
+) -> Response:
+    admin, fehler = _plattform_pruefen(request, user, csrf_token)
+    if admin is None:
+        return fehler  # type: ignore[return-value]
+    werte = {"name": name.strip(), "admin_email": admin_email.strip()}
+    if not werte["name"] or len(werte["name"]) > 200:
+        return _plattform_seite(
+            request, admin, session, meldung=MSG_BUERO_NAME, ok=False, werte=werte, status_code=422
+        )
+    try:
+        TypeAdapter(EmailStr).validate_python(werte["admin_email"])
+    except ValidationError:
+        return _plattform_seite(
+            request,
+            admin,
+            session,
+            meldung=MSG_BUERO_MAIL_UNGUELTIG,
+            ok=False,
+            werte=werte,
+            status_code=422,
+        )
+    try:
+        _, mail = plattform.lege_buero_an(session, werte["name"], werte["admin_email"])
+    except einladung_svc.EmailExistiertError:
+        return _plattform_seite(
+            request, admin, session, meldung=MSG_BUERO_EMAIL, ok=False, werte=werte, status_code=409
+        )
+    background.add_task(send_safely, mailer, mail)
+    return _plattform_seite(request, admin, session, meldung=MSG_BUERO_ANGELEGT)
+
+
+@web_router.post("/plattform/{buero_id}/name", response_model=None)
+def plattform_buero_umbenennen(
+    request: Request,
+    buero_id: uuid.UUID,
+    user: Annotated[User | None, Depends(_optional_user)],
+    name: Annotated[str, Form()] = "",
+    csrf_token: Annotated[str, Form()] = "",
+    session: Session = Depends(get_session),
+) -> Response:
+    admin, fehler = _plattform_pruefen(request, user, csrf_token)
+    if admin is None:
+        return fehler  # type: ignore[return-value]
+    if not name.strip() or len(name.strip()) > 200:
+        return _plattform_seite(
+            request, admin, session, meldung=MSG_BUERO_NAME, ok=False, status_code=422
+        )
+    try:
+        plattform.benenne_um(session, buero_id, name)
+    except plattform.BueroNotFoundError:
+        return _plattform_seite(
+            request, admin, session, meldung=MSG_BUERO_UNBEKANNT, ok=False, status_code=404
+        )
+    return _plattform_seite(request, admin, session, meldung=MSG_GESPEICHERT)
+
+
+@web_router.post("/plattform/{buero_id}/status", response_model=None)
+def plattform_buero_sperren(
+    request: Request,
+    buero_id: uuid.UUID,
+    user: Annotated[User | None, Depends(_optional_user)],
+    aktiv: Annotated[str, Form()] = "",
+    csrf_token: Annotated[str, Form()] = "",
+    session: Session = Depends(get_session),
+) -> Response:
+    admin, fehler = _plattform_pruefen(request, user, csrf_token)
+    if admin is None:
+        return fehler  # type: ignore[return-value]
+    try:
+        plattform.setze_aktiv(session, buero_id, aktiv == "1")
+    except plattform.BueroNotFoundError:
+        return _plattform_seite(
+            request, admin, session, meldung=MSG_BUERO_UNBEKANNT, ok=False, status_code=404
+        )
+    return _plattform_seite(request, admin, session, meldung=MSG_GESPEICHERT)
 
 
 MSG_BEGRUENDUNG = "Bitte geben Sie eine Begründung an."

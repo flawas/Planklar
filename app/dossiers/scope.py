@@ -10,7 +10,7 @@ from datetime import UTC, datetime, timedelta
 from typing import Any
 
 from fastapi import Depends, HTTPException, status
-from sqlalchemy import select, update
+from sqlalchemy import func, select, update
 from sqlalchemy.orm import Session
 
 from app.auth.users import current_user
@@ -33,6 +33,11 @@ class BueroScope:
     def list_dossiers(self) -> Sequence[Dossier]:
         stmt = select(Dossier).where(Dossier.buero_id == self.buero_id)
         return self.session.scalars(stmt.order_by(Dossier.created_at)).all()
+
+    def anzahl_dossiers(self) -> int:
+        """Nur die Anzahl, keine Inhalte (Plattform-Übersicht)."""
+        stmt = select(func.count()).select_from(Dossier).where(Dossier.buero_id == self.buero_id)
+        return self.session.scalar(stmt) or 0
 
     def get_dossier(self, dossier_id: uuid.UUID) -> Dossier:
         stmt = select(Dossier).where(Dossier.id == dossier_id, Dossier.buero_id == self.buero_id)

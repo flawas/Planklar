@@ -11,6 +11,7 @@ from app.db.session import get_sessionmaker
 from app.dossiers.router import dossier_router, vorschau_router
 from app.logging_setup import configure_logging, install_request_logging
 from app.rules.store import lade_katalog
+from app.storage import Storage
 from app.web.router import BASE_DIR, web_router
 
 configure_logging()
@@ -18,9 +19,10 @@ configure_logging()
 
 @asynccontextmanager
 async def lifespan(_: FastAPI) -> AsyncIterator[None]:
-    """Lädt den Regelkatalog; ein ungültiger Katalog (RegelLadeFehler) bricht den Start ab."""
+    """Lädt den Regelkatalog und legt den Bucket an; ein ungültiger Katalog bricht den Start ab."""
     with get_sessionmaker()() as session:
         lade_katalog(session, get_settings().git_commit)
+    Storage().ensure_bucket()
     yield
 
 

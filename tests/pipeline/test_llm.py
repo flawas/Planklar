@@ -108,6 +108,7 @@ def test_litellm_client_uses_configured_model(monkeypatch: pytest.MonkeyPatch) -
     finally:
         get_settings.cache_clear()
     assert seen["model"] == "provider/test-model"
+    assert seen["drop_params"] is True  # Modelle ohne temperature=0 (Claude 5) dürfen nicht scheitern
     assert answer.model == "provider/test-model-2026"
 
 

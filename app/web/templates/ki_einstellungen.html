@@ -23,7 +23,8 @@
 
   <label for="api_key">API-Schlüssel</label>
   <input id="api_key" name="api_key" type="password" autocomplete="new-password"
-         placeholder="{{ 'Hinterlegt – leer lassen zum Beibehalten' if key_gesetzt else 'Noch nicht hinterlegt' }}">
+         placeholder="{{ 'Nicht mehr lesbar – bitte neu setzen' if key_unlesbar else ('Hinterlegt – leer lassen zum Beibehalten' if key_gesetzt else 'Noch nicht hinterlegt') }}">
+  {% if key_unlesbar %}<p class="fehler">Der gespeicherte Schlüssel ist nicht mehr lesbar (Geheimnis der Installation gewechselt). Bitte den API-Schlüssel neu setzen.</p>{% endif %}
   {% if key_gesetzt %}
   <label><input type="checkbox" name="clear_key" value="1"> Gespeicherten Schlüssel entfernen</label>
   {% endif %}

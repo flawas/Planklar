@@ -99,3 +99,13 @@ def test_verbindungstest(
     assert (
         "Verbindung fehlgeschlagen." in client.post(URL + "/test", data={"csrf_token": admin}).text
     )
+
+
+def test_unlesbarer_key_wird_angezeigt(client: TestClient, db: Session, admin: str) -> None:
+    speichern(client, admin, modell="m", api_key="sk-1")
+    row = db.get(KiEinstellung, 1)
+    assert row
+    row.api_key_verschluesselt = "kaputt"
+    db.commit()
+    r = client.get(URL)
+    assert "nicht mehr lesbar" in r.text and "Hinterlegt" not in r.text

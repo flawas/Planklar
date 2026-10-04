@@ -292,6 +292,11 @@ def _ki_seite(
         werte=werte or {"modell": "", "api_base": "", **gespeichert},
         fehler=fehler or {},
         key_gesetzt=bool(row and row.api_key_verschluesselt),
+        key_unlesbar=bool(
+            row
+            and row.api_key_verschluesselt
+            and not llm_config.key_lesbar(row.api_key_verschluesselt)
+        ),
         vorschlaege=ki_einstellungen.MODELL_VORSCHLAEGE,
         meldung=meldung,
         ok=ok,

@@ -51,6 +51,17 @@ def decrypt_key(token: str) -> str:
         return ""
 
 
+def key_lesbar(token: str) -> bool:
+    """Ob ein gespeichertes Chiffrat mit dem aktuellen `AUTH_SECRET` entschlüsselbar ist."""
+    if not token:
+        return False
+    try:
+        _fernet().decrypt(token.encode())
+    except InvalidToken:
+        return False
+    return True
+
+
 def get_row(session: Session) -> KiEinstellung | None:
     return session.get(KiEinstellung, 1)
 

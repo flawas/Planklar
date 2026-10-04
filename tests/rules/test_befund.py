@@ -143,6 +143,38 @@ def test_merkmal_mehrere_seiten_erfuellt_nur_wenn_alle_ok() -> None:
     assert pruefe(r, Evidenz(seiten=(ok, luecke, unklar))).ergebnis == Ergebnis.UNSICHER
 
 
+@pytest.mark.parametrize("wert", ["", "  ", 0, [], {}, False])
+def test_merkmal_leerer_wert_fehlt(wert: Any) -> None:
+    r = _regel("plan_merkmal", dokument="Situationsplan", merkmal="nordpfeil")
+    e = Evidenz(seiten=(_seite("s1", "Situationsplan", nordpfeil=_m(wert)),))
+    assert pruefe(r, e).ergebnis == Ergebnis.FEHLT
+
+
+def test_merkmal_unsichere_seite_anderen_typs_unsicher() -> None:
+    r = _regel("plan_merkmal", dokument="Grundriss", merkmal="massstab")
+    e = Evidenz(
+        seiten=(
+            _seite("s1", "Grundriss", massstab=_m("1:100")),
+            _seite("s2", "Sonstiges", 0.3),
+        )
+    )
+    b = pruefe(r, e)
+    assert (b.ergebnis, b.seiten) == (Ergebnis.UNSICHER, ("s2",))
+
+
+def test_merkmal_sichere_seite_anderen_typs_ignoriert() -> None:
+    r = _regel("plan_merkmal", dokument="Grundriss", merkmal="massstab")
+    e = Evidenz(seiten=(_seite("s1", "Grundriss", massstab=_m("1:100")), _seite("s2", "Schnitt")))
+    assert pruefe(r, e).ergebnis == Ergebnis.ERFUELLT
+
+
+def test_merkmal_ohne_dokument_alle_seiten_muessen_merkmal_haben() -> None:
+    r = _regel("plan_merkmal", merkmal="nordpfeil")
+    e = Evidenz(seiten=(_seite("s1", "Grundriss", nordpfeil=_m()), _seite("s2", "Schnitt")))
+    b = pruefe(r, e)
+    assert (b.ergebnis, b.seiten) == (Ergebnis.FEHLT, ("s2",))
+
+
 def test_merkmal_schwelle_konfigurierbar() -> None:
     r = _regel("plan_merkmal", dokument="Grundriss", merkmal="massstab")
     e = Evidenz(seiten=(_seite("s1", "Grundriss", massstab=_m(konf=0.7)),))

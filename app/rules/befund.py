@@ -7,7 +7,8 @@ nachweislich nicht vorliegt).
 Erwartete `requires`-Felder je Prüfmethode:
 
 - `ki_klassifikation`: `dokument` (Plantyp, der vorliegen muss)
-- `plan_merkmal`: `merkmal` (Name), optional `dokument` (Plantyp) und `wert` (Sollwert)
+- `plan_merkmal`: `merkmal` (Name), optional `dokument` (Plantyp) und `wert` (Sollwert);
+  ohne `dokument` muss jede Seite des Dossiers das Merkmal haben, sonst `fehlt`
 - `formularfeld`: `feld` (Name), optional `wert` (Sollwert)
 - `manuell`: keine; massgeblich ist die Bestätigung zur Regel-`id`
 """
@@ -127,18 +128,19 @@ def _plan_merkmal(regel: Regel, evidenz: Evidenz, s: Schwellen) -> Befund:
         seiten = evidenz.seiten
     else:
         seiten = tuple(p for p in evidenz.seiten if p.plantyp == dokument)
-        if not seiten:
-            unklar = tuple(
-                p.seite_id for p in evidenz.seiten if not _sicher(p.konfidenz, s.klassifikation)
-            )
-            if unklar:
-                return _befund(regel, Ergebnis.UNSICHER, "Plantyp nicht sicher erkannt", unklar)
-            return _befund(regel, Ergebnis.FEHLT, f"{dokument} nicht im Dossier")
-        unsicher_typ = tuple(
+        # Unsicher klassifizierte Seiten anderer Typen könnten das Dokument sein.
+        unklar = tuple(
+            p.seite_id
+            for p in evidenz.seiten
+            if p.plantyp != dokument and not _sicher(p.konfidenz, s.klassifikation)
+        )
+        unsicher_typ = unklar + tuple(
             p.seite_id for p in seiten if not _sicher(p.konfidenz, s.klassifikation)
         )
         if unsicher_typ:
             return _befund(regel, Ergebnis.UNSICHER, "Plantyp nicht sicher erkannt", unsicher_typ)
+        if not seiten:
+            return _befund(regel, Ergebnis.FEHLT, f"{dokument} nicht im Dossier")
     if not seiten:
         return _befund(regel, Ergebnis.FEHLT, "Keine Planseite im Dossier")
 
@@ -148,13 +150,11 @@ def _plan_merkmal(regel: Regel, evidenz: Evidenz, s: Schwellen) -> Befund:
     fehlt: list[str] = []
     for seite in seiten:
         merkmal = seite.merkmale.get(name)
-        if merkmal is None or merkmal.wert is None:
+        if merkmal is None or _leer(merkmal.wert):
             fehlt.append(seite.seite_id)
         elif not merkmal.einig or not _sicher(merkmal.konfidenz, s.merkmal):
             unsicher.append(seite.seite_id)
         elif soll is not None and merkmal.wert != soll:
-            fehlt.append(seite.seite_id)
-        elif merkmal.wert is False:
             fehlt.append(seite.seite_id)
         else:
             ok.append(seite.seite_id)

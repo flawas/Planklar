@@ -104,8 +104,9 @@ class BueroScope:
 
     def add_dokument(self, dossier_id: uuid.UUID, **fields: Any) -> Dokument:
         fields.pop("dossier_id", None)
+        fields.pop("buero_id", None)
         self.get_dossier(dossier_id)
-        dokument = Dokument(dossier_id=dossier_id, **fields)
+        dokument = Dokument(dossier_id=dossier_id, buero_id=self.buero_id, **fields)
         self.session.add(dokument)
         self.session.flush()
         return dokument
@@ -138,7 +139,7 @@ class BueroScope:
         stmt = select(Seite).where(Seite.dokument_id == dokument_id, Seite.nummer == nummer)
         seite = self.session.scalars(stmt).one_or_none()
         if seite is None:
-            seite = Seite(dokument_id=dokument_id, nummer=nummer)
+            seite = Seite(dokument_id=dokument_id, buero_id=self.buero_id, nummer=nummer)
             self.session.add(seite)
             self.session.flush()
         return seite
@@ -195,7 +196,10 @@ class BueroScope:
         """Startet einen Prüflauf; Regelset-Hash und Modellversion sind Pflicht."""
         self.get_dossier(dossier_id)
         pruefung = Pruefung(
-            dossier_id=dossier_id, regelset_hash=regelset_hash, modellversion=modellversion
+            dossier_id=dossier_id,
+            buero_id=self.buero_id,
+            regelset_hash=regelset_hash,
+            modellversion=modellversion,
         )
         self.session.add(pruefung)
         self.session.flush()
@@ -300,7 +304,11 @@ class BueroScope:
     ) -> Befund:
         self.get_pruefung(pruefung_id)
         befund = Befund(
-            pruefung_id=pruefung_id, regel_id=regel_id, ergebnis=ergebnis, belege=belege or []
+            pruefung_id=pruefung_id,
+            buero_id=self.buero_id,
+            regel_id=regel_id,
+            ergebnis=ergebnis,
+            belege=belege or [],
         )
         self.session.add(befund)
         self.session.flush()

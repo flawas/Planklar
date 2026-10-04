@@ -169,3 +169,33 @@ def test_eigenes_buero_pruefung_und_override(world: World) -> None:
 def test_override_ohne_begruendung_abgelehnt(world: World) -> None:
     with pytest.raises(ValueError):
         world.a.set_override(world.befund_id, Ergebnis.ERFUELLT, "  ")
+
+
+def test_scope_setzt_buero_id_auf_allen_kindern(world: World) -> None:
+    ids = {
+        Dokument: world.dokument_id,
+        Seite: world.seite_id,
+        Pruefung: world.pruefung_id,
+        Befund: world.befund_id,
+    }
+    for modell, id_ in ids.items():
+        assert world.session.get(modell, id_).buero_id == world.a.buero_id, modell.__name__
+
+
+def test_neues_dokument_und_neue_pruefung_gehoeren_zum_scope_buero(world: World) -> None:
+    dok = world.a.add_dokument(
+        world.dossier_id, dateiname="y.pdf", sha256="b" * 64, seitenzahl=1, speicherpfad="q"
+    )
+    seite = world.a.get_or_add_seite(dok.id, 1)
+    pruefung = world.a.add_pruefung(world.dossier_id, regelset_hash="h" * 64, modellversion="m2")
+    befund = world.a.add_befund(pruefung.id, regel_id="lu.r2", ergebnis=Ergebnis.FEHLT)
+    assert {dok.buero_id, seite.buero_id, pruefung.buero_id, befund.buero_id} == {world.a.buero_id}
+
+
+def test_buero_id_wird_bei_relationship_anlage_vom_elternobjekt_uebernommen(
+    world: World,
+) -> None:
+    pruefung = world.session.get(Pruefung, world.pruefung_id)
+    pruefung.befunde.append(Befund(regel_id="lu.r3", ergebnis=Ergebnis.MANUELL))
+    world.session.flush()
+    assert pruefung.befunde[-1].buero_id == world.a.buero_id

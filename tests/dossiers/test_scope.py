@@ -75,6 +75,8 @@ FREMDZUGRIFF: dict[str, Op] = {
     "get_seite": lambda sc, w: sc.get_seite(w.seite_id),
     "update_seite": lambda sc, w: sc.update_seite(w.seite_id, plantyp="grundriss"),
     "get_or_add_seite": lambda sc, w: sc.get_or_add_seite(w.dokument_id, 2),
+    "lock_dossier": lambda sc, w: sc.lock_dossier(w.dossier_id),
+    "hat_aktiven_lauf": lambda sc, w: sc.hat_aktiven_lauf(w.dossier_id, timedelta(minutes=1)),
     "list_pruefungen": lambda sc, w: sc.list_pruefungen(w.dossier_id),
     "get_pruefung": lambda sc, w: sc.get_pruefung(w.pruefung_id),
     "add_pruefung": lambda sc, w: sc.add_pruefung(

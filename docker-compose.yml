@@ -26,8 +26,12 @@ x-app: &app
 services:
   web:
     <<: *app
-    # Migration vor dem Start: das Lifespan schreibt den Regelkatalog in die DB.
-    command: ["sh", "-c", "alembic upgrade head && exec uvicorn app.main:app --host 0.0.0.0 --port 8000"]
+    # Migrationen vor dem Start (das Lifespan schreibt den Regelkatalog in die DB);
+    # schlägt `alembic upgrade head` fehl, startet uvicorn nicht.
+    command:
+      - sh
+      - -c
+      - alembic upgrade head && exec uvicorn app.main:app --host 0.0.0.0 --port 8000
     ports:
       - "8000:8000"
 

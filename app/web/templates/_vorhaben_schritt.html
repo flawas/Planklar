@@ -1,0 +1,69 @@
+<form id="assistent" class="formular assistent" method="post" action="/vorhaben/schritt"
+      hx-post="/vorhaben/schritt" hx-target="#assistent" hx-swap="outerHTML">
+  <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+  <input type="hidden" name="schritt" value="{{ v.schritt }}">
+  {% for name, wert in v.versteckt %}
+  <input type="hidden" name="{{ name }}" value="{{ wert }}">
+  {% endfor %}
+  <nav aria-label="Fortschritt">
+    <ol class="schritte">
+      {% for nr, titel in v.schritte %}
+      <li{% if nr == v.schritt %} aria-current="step"{% endif %}>
+        {{ titel }}{% if nr == v.schritt %} (aktueller Schritt){% elif nr < v.schritt %} (erledigt){% endif %}
+      </li>
+      {% endfor %}
+    </ol>
+  </nav>
+  {% if v.meldung %}<p class="fehler" role="alert">{{ v.meldung }}</p>{% endif %}
+  <fieldset>
+    <legend>Schritt {{ v.schritt }} von {{ v.schritte|length }}: {{ v.titel }}</legend>
+    {% if v.schritt <= 4 %}
+      {% set name = v.feldname %}
+      {% if v.fehler.get(name) %}<p class="fehler" id="fehler-{{ name }}" role="alert">{{ v.fehler[name] }}</p>{% endif %}
+      {% for wert, label in v.optionen.items() %}
+      <div class="option">
+        <input type="radio" id="{{ name }}-{{ loop.index }}" name="{{ name }}" value="{{ wert }}"
+               {% if v.werte.get(name) == wert %}checked{% endif %}
+               {% if loop.first %}autofocus{% endif %} required
+               {% if v.fehler.get(name) %}aria-describedby="fehler-{{ name }}"{% endif %}>
+        <label for="{{ name }}-{{ loop.index }}">{{ label }}</label>
+      </div>
+      {% endfor %}
+    {% else %}
+      {% for f in v.felder %}
+        {% if f.art == "ja_nein" %}
+        <fieldset class="gruppe">
+          <legend>{{ f.label }}</legend>
+          {% if f.fehler %}<p class="fehler" id="fehler-{{ f.name }}" role="alert">{{ f.fehler }}</p>{% endif %}
+          {% for wert, label in (("ja", "Ja"), ("nein", "Nein")) %}
+          <div class="option">
+            <input type="radio" id="{{ f.name }}-{{ wert }}" name="{{ f.name }}" value="{{ wert }}"
+                   {% if f.wert == wert %}checked{% endif %} required
+                   {% if f.fehler %}aria-describedby="fehler-{{ f.name }}"{% endif %}>
+            <label for="{{ f.name }}-{{ wert }}">{{ label }}</label>
+          </div>
+          {% endfor %}
+        </fieldset>
+        {% else %}
+        <div class="gruppe">
+          <label for="{{ f.name }}">{{ f.label }} (optional)</label>
+          {% if f.fehler %}<p class="fehler" id="fehler-{{ f.name }}" role="alert">{{ f.fehler }}</p>{% endif %}
+          <input id="{{ f.name }}" name="{{ f.name }}" value="{{ f.wert }}"
+                 {% if f.art == "zahl" %}type="text" inputmode="decimal"{% else %}type="text" maxlength="100"{% endif %}
+                 {% if f.fehler %}aria-invalid="true" aria-describedby="fehler-{{ f.name }}"{% endif %}>
+        </div>
+        {% endif %}
+      {% endfor %}
+    {% endif %}
+  </fieldset>
+  <div class="aktionen">
+    {% if v.schritt > 1 %}
+    <button type="submit" name="aktion" value="zurueck" class="zweit" formnovalidate>Zurück</button>
+    {% endif %}
+    {% if v.letzter %}
+    <button type="submit" name="aktion" value="fertig">Dossier anlegen</button>
+    {% else %}
+    <button type="submit" name="aktion" value="weiter">Weiter</button>
+    {% endif %}
+  </div>
+</form>

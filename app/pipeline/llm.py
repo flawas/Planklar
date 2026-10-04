@@ -74,6 +74,10 @@ class LiteLLMClient:
         settings = get_settings()
         if not settings.llm_model:
             raise LLMConfigError("LLM_MODEL ist nicht gesetzt")
+        if settings.llm_model == "fake":  # nur E2E-Stack mit synthetischen Dossiers
+            from app.pipeline import fake_llm
+
+            return fake_llm.complete(schema)
 
         content: list[dict[str, Any]] = [{"type": "text", "text": question}]
         if text is not None:

@@ -1,0 +1,11 @@
+# Overlay für den End-to-End-Test: docker compose -f docker-compose.yml -f docker-compose.e2e.yml up -d --build
+# Der Fake-LLM beantwortet Merkmalsfragen deterministisch (app/pipeline/fake_llm.py); es geht nichts ans Netz.
+x-e2e: &e2e
+  environment:
+    LLM_MODEL: fake
+    LLM_API_KEY: ""
+    AUTH_COOKIE_SECURE: "false"
+
+services:
+  web: *e2e
+  worker: *e2e

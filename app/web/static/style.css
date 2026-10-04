@@ -32,3 +32,19 @@ button { padding: .5rem 1rem; border: 0; border-radius: 4px; background: var(--a
 .gruppe { margin-bottom: .75rem; display: grid; gap: .25rem; }
 .aktionen { display: flex; gap: .75rem; }
 button.zweit { background: #fff; color: var(--akzent); border: 2px solid var(--akzent); }
+
+/* Prüfbericht: Ampel immer mit Text und Symbol, Farbe ist nur Zusatz */
+.hinweis { border: 1px solid var(--rand); border-radius: 4px; padding: .5rem .75rem; background: #f4f6f8; }
+.zaehler { list-style: none; padding: 0; display: flex; flex-wrap: wrap; gap: .5rem; }
+.ampel { display: inline-block; padding: .1rem .5rem; border-radius: 4px; font-weight: 700; border: 2px solid currentColor; }
+.ampel-erfuellt { color: #1b6e2e; } .ampel-fehlt { color: #9b1c1c; }
+.ampel-unsicher { color: #7a5600; } .ampel-manuell { color: #0b5394; }
+.befund { border: 1px solid var(--rand); border-left-width: 6px; border-radius: 4px; padding: .5rem .75rem; margin: 0 0 1rem; }
+.befund.ampel-erfuellt { border-left-color: #1b6e2e; } .befund.ampel-fehlt { border-left-color: #9b1c1c; }
+.befund.ampel-unsicher { border-left-color: #7a5600; } .befund.ampel-manuell { border-left-color: #0b5394; }
+.befund h3 { margin: 0 0 .25rem; font-size: 1.05rem; }
+.befund .ampel { margin-right: .5rem; }
+.quelle, .override, .beleg-leer { font-size: .9rem; margin: .25rem 0; }
+.vorschau { max-width: 100%; height: auto; border: 1px solid var(--rand); }
+.aktionen { display: flex; flex-wrap: wrap; gap: .75rem; align-items: flex-start; }
+.meta dt { float: left; clear: left; width: 8rem; font-weight: 700; } .meta dd { margin: 0 0 .15rem 8.5rem; }

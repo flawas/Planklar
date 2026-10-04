@@ -1,0 +1,35 @@
+{# Gemeinsamer Berichtsbaum für Web und PDF (modus = "web" | "pdf"). #}
+{% set p = pruefung %}
+<section id="bericht"{% if modus != "pdf" and p.status.value == "laeuft" %}
+  hx-get="/dossiers/{{ dossier.id }}/pruefungen/{{ p.id }}/bericht" hx-trigger="every 3s" hx-swap="outerHTML"{% endif %}>
+  <h1>Prüfbericht Dossier {{ dossier.gemeinde }}</h1>
+  <p class="hinweis"><strong>Das Tool gibt Hinweise und entscheidet nichts.</strong>
+    Der Bericht prüft nur die formale Vollständigkeit und enthält keine Aussage zur Bewilligung.</p>
+  <dl class="meta">
+    <dt>Kanton</dt><dd>{{ dossier.kanton.value }}</dd>
+    <dt>Gemeinde</dt><dd>{{ dossier.gemeinde }}</dd>
+    <dt>Gestartet</dt><dd>{{ p.gestartet_am.strftime("%d.%m.%Y %H:%M") }}</dd>
+    <dt>Regelstand</dt><dd>{{ p.regelset_hash[:12] }}</dd>
+    <dt>Modell</dt><dd>{{ p.modellversion }}</dd>
+  </dl>
+  {% if p.status.value == "laeuft" %}
+  <p role="status">Prüfung läuft: {{ p.seiten_fertig }} von {{ p.seiten_gesamt }} Seiten verarbeitet.
+    <progress max="{{ p.seiten_gesamt or 1 }}" value="{{ p.seiten_fertig }}"></progress></p>
+  {% elif p.status.value == "fehlgeschlagen" %}
+  <p class="fehler" role="alert">Die Prüfung ist fehlgeschlagen. Bitte starten Sie sie erneut.</p>
+  {% else %}
+  {% if bericht.regelset_abweichend %}
+  <p class="hinweis">Hinweis: Der Regelkatalog wurde seit dieser Prüfung geändert. Quellen zeigen den aktuellen Stand.</p>
+  {% endif %}
+  <ul class="zaehler" aria-label="Zusammenfassung">
+    {% for e, text, symbol, anzahl in bericht.zaehler %}
+    <li class="ampel ampel-{{ e.name | lower }}"><span aria-hidden="true">{{ symbol }}</span> {{ text }}: {{ anzahl }}</li>
+    {% endfor %}
+  </ul>
+  {% for z in bericht.zeilen %}
+  {% include "_befund.html" %}
+  {% else %}
+  <p>Es sind keine Anforderungen ausgewertet worden.</p>
+  {% endfor %}
+  {% endif %}
+</section>

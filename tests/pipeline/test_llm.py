@@ -121,3 +121,19 @@ def test_litellm_client_requires_model(monkeypatch: pytest.MonkeyPatch) -> None:
             ask("Frage", SCHEMA, text="x", client=llm.LiteLLMClient())
     finally:
         get_settings.cache_clear()
+
+
+def test_fake_modell_liefert_schemakonforme_antworten(monkeypatch: pytest.MonkeyPatch) -> None:
+    from app.config import get_settings
+    from app.pipeline.classify import VISION_SCHEMA
+    from app.pipeline.merkmale import schema_fuer
+
+    monkeypatch.setenv("LLM_MODEL", "fake")
+    get_settings.cache_clear()
+    try:
+        klass = ask("Frage", VISION_SCHEMA, image=b"png")
+        assert klass.data["plantyp"] == "Sonstiges" and klass.model == "fake"
+        merkmal = ask("Frage", schema_fuer("massstab"), image=b"png")
+        assert merkmal.data["vorhanden"] == "ja"
+    finally:
+        get_settings.cache_clear()

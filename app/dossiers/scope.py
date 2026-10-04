@@ -14,7 +14,7 @@ from sqlalchemy import select, update
 from sqlalchemy.orm import Session
 
 from app.auth.users import current_user
-from app.db.models import Befund, Dokument, Dossier, Ergebnis, Pruefung, Seite, User
+from app.db.models import Befund, Dokument, Dossier, Ergebnis, Pruefstatus, Pruefung, Seite, User
 from app.db.session import get_session
 
 
@@ -34,6 +34,18 @@ class BueroScope:
 
     def get_dossier(self, dossier_id: uuid.UUID) -> Dossier:
         stmt = select(Dossier).where(Dossier.id == dossier_id, Dossier.buero_id == self.buero_id)
+        dossier = self.session.scalars(stmt).one_or_none()
+        if dossier is None:
+            raise NotFoundError
+        return dossier
+
+    def lock_dossier(self, dossier_id: uuid.UUID) -> Dossier:
+        """Wie `get_dossier`, sperrt die Zeile aber bis zum Ende der Transaktion (FOR UPDATE)."""
+        stmt = (
+            select(Dossier)
+            .where(Dossier.id == dossier_id, Dossier.buero_id == self.buero_id)
+            .with_for_update()
+        )
         dossier = self.session.scalars(stmt).one_or_none()
         if dossier is None:
             raise NotFoundError
@@ -145,6 +157,26 @@ class BueroScope:
         self.get_dossier(dossier_id)
         stmt = select(Pruefung).where(Pruefung.dossier_id == dossier_id)
         return self.session.scalars(stmt.order_by(Pruefung.gestartet_am)).all()
+
+    def hat_aktiven_lauf(self, dossier_id: uuid.UUID, lease: timedelta) -> bool:
+        """Prüft, ob ein Lauf wirklich aktiv ist; verwaiste Läufe werden `fehlgeschlagen`.
+
+        Aktiv ist ein Lauf mit gültiger Lease bzw. ein noch nie geclaimter, jüngerer als `lease`.
+        Ein Lauf mit abgelaufener Lease (Worker abgestürzt, Task verloren) blockiert nicht.
+        """
+        jetzt = datetime.now(UTC)
+        aktiv = False
+        for p in self.list_pruefungen(dossier_id):
+            if p.status != Pruefstatus.LAEUFT:
+                continue
+            frist = p.lauf_bis or (p.gestartet_am + lease)
+            if frist > jetzt:
+                aktiv = True
+            else:
+                p.status = Pruefstatus.FEHLGESCHLAGEN
+                p.beendet_am = jetzt
+        self.session.flush()
+        return aktiv
 
     def get_pruefung(self, pruefung_id: uuid.UUID) -> Pruefung:
         stmt = (

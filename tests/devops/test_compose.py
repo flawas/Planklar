@@ -26,3 +26,8 @@ def test_env_example_ohne_secrets() -> None:
     env = (ROOT / ".env.example").read_text(encoding="utf-8")
     assert "AUTH_SECRET=change-me" in env
     assert "LLM_API_KEY=\n" in env
+
+
+def test_s3_zugangsdaten_fuer_app_und_speicher() -> None:
+    assert "S3_ACCESS_KEY: ${S3_ACCESS_KEY:-liquet}" in COMPOSE
+    assert "AWS_ACCESS_KEY_ID: ${S3_ACCESS_KEY:-liquet}" in COMPOSE

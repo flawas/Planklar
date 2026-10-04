@@ -4,7 +4,7 @@ from typing import Any, Literal
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
-from app.db.models import Dossierstatus, Kanton, Vorhabenstyp
+from app.db.models import Dossierstatus, Ergebnis, Kanton, Pruefstatus, Vorhabenstyp
 
 
 class DokumentRead(BaseModel):
@@ -109,3 +109,29 @@ class DossierRead(BaseModel):
     attribute: dict[str, Any]
     status: Dossierstatus
     created_at: datetime
+
+
+class PruefungRead(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: uuid.UUID
+    dossier_id: uuid.UUID
+    status: Pruefstatus
+    regelset_hash: str
+    modellversion: str
+    gestartet_am: datetime
+    beendet_am: datetime | None
+    seiten_gesamt: int
+    seiten_fertig: int
+
+
+class BefundRead(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: uuid.UUID
+    regel_id: str
+    ergebnis: Ergebnis
+    belege: list[str]
+    override_ergebnis: Ergebnis | None
+    override_begruendung: str | None
+    override_am: datetime | None

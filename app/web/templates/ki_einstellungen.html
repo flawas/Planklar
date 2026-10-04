@@ -1,3 +1,4 @@
+{% from "_icons.html" import icon %}
 {% extends "base.html" %}
 {% block title %}KI-Einstellungen{% endblock %}
 {% block content %}
@@ -35,5 +36,5 @@
   <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
   <button type="submit" class="zweit">Verbindung testen</button>
 </form>
-<p><a href="/">Zurück</a></p>
+<p><a class="btn text" href="/">{{ icon("arrow_back") }}Zurück</a></p>
 {% endblock %}

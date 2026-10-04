@@ -1,8 +1,12 @@
+{% from "_icons.html" import icon %}
 {% extends "base.html" %}
 {% block title %}Start{% endblock %}
 {% block content %}
 <h1>Willkommen</h1>
 <p>Sie sind angemeldet als {{ user.email }}.</p>
-<p><a href="/vorhaben">Meine Vorhaben</a> · <a href="/vorhaben/neu">Neues Vorhaben erfassen</a></p>
-{% if user.is_superuser %}<p><a href="/einstellungen/ki">KI-Einstellungen</a></p>{% endif %}
+<div class="karten">
+  <a class="karte" href="/vorhaben">{{ icon("folder_open") }}<strong>Meine Vorhaben</strong><span>Bestehende Dossiers und Prüfungen</span></a>
+  <a class="karte" href="/vorhaben/neu">{{ icon("add") }}<strong>Neues Vorhaben erfassen</strong><span>Dossier anlegen und Unterlagen hochladen</span></a>
+  {% if user.is_superuser %}<a class="karte" href="/einstellungen/ki">{{ icon("settings") }}<strong>KI-Einstellungen</strong><span>Anbieter, Modell und Schlüssel</span></a>{% endif %}
+</div>
 {% endblock %}

@@ -112,3 +112,15 @@ def test_logout_ohne_csrf_abgelehnt(client: TestClient, db: Session) -> None:
     r = client.post("/logout", data={}, follow_redirects=False)
     assert r.status_code == 403
     assert client.get("/", follow_redirects=False).status_code == 200
+
+
+def test_schrift_und_icons_lokal_ohne_externe_anfragen(client: TestClient, db: Session) -> None:
+    css = client.get("/static/style.css")
+    assert "Roboto" in css.text and "https://" not in css.text.replace(
+        "https://m3.material.io/", ""
+    )
+    for gewicht in (400, 500, 700):
+        font = client.get(f"/static/fonts/roboto-latin-{gewicht}.woff2")
+        assert font.status_code == 200 and font.content[:4] == b"wOF2"
+    html = client.get("/login").text
+    assert "fonts.googleapis.com" not in html and "fonts.gstatic.com" not in html

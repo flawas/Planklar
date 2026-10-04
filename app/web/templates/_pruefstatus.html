@@ -1,3 +1,4 @@
+{% from "_icons.html" import icon %}
 {# Prüflauf-Bereich im Dossier: Button, Fortschritt (HTMX-Polling), Fehlerzustand. #}
 {% set p = pruefung %}
 <div id="pruefung"{% if p and p.status.value == "laeuft" %}
@@ -13,12 +14,12 @@
   <p class="fehler" role="alert">Die letzte Prüfung ist fehlgeschlagen. Ihre Unterlagen sind unverändert; bitte starten Sie die Prüfung erneut.</p>
   {% elif p and p.status.value == "abgeschlossen" %}
   <p role="status">Die letzte Prüfung ist abgeschlossen.
-    <a href="/dossiers/{{ dossier.id }}/pruefungen/{{ p.id }}/bericht">Bericht ansehen</a></p>
+    <a class="btn text" href="/dossiers/{{ dossier.id }}/pruefungen/{{ p.id }}/bericht">{{ icon("description") }}Bericht ansehen</a></p>
   {% endif %}
   <form class="formular" method="post" action="/dossiers/{{ dossier.id }}/pruefen"
         hx-post="/dossiers/{{ dossier.id }}/pruefen" hx-target="#pruefung" hx-swap="outerHTML">
     <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
-    <button type="submit">{{ "Erneut prüfen" if p else "Prüfen" }}</button>
+    <button type="submit">{{ icon("refresh" if p else "play_arrow") }}{{ "Erneut prüfen" if p else "Prüfen" }}</button>
   </form>
   {% endif %}
 </div>

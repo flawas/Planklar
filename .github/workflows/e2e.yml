@@ -27,7 +27,8 @@ jobs:
         with:
           python-version: "3.12"
           cache: pip
-      - run: pip install -e ".[dev]"
+      # Nur der Test-Client, Versionen fest und ohne Build-Skripte (Wheels).
+      - run: pip install --only-binary :all: httpx==0.28.1 pymupdf==1.28.2 pytest==9.1.1
       - name: Stack hochfahren (Fake-LLM)
         run: |
           docker compose up -d --build

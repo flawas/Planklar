@@ -31,6 +31,10 @@ class Settings(BaseSettings):
     auth_cookie_secure: bool = True
     auth_cookie_samesite: Literal["lax", "strict", "none"] = "lax"
     auth_session_seconds: int = 8 * 3600
+    # Login-Schutz: Fehlversuche im Fenster, danach Sperre bis der älteste Versuch abläuft
+    login_max_fehlversuche_email: int = 5
+    login_max_fehlversuche_ip: int = 20
+    login_fenster_sekunden: int = 15 * 60
     oidc_enabled: bool = False
     oidc_issuer: str = ""
     oidc_client_id: str = ""

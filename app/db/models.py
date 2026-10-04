@@ -109,6 +109,8 @@ class User(Base):
     )
     is_superuser = synonym("is_plattform_admin")
     is_verified: Mapped[bool] = mapped_column(Boolean, default=False, server_default="false")
+    # Steckt im Session-Token; jede Erhöhung macht bestehende Sitzungen ungültig
+    session_version: Mapped[int] = mapped_column(Integer, default=0, server_default="0")
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
 
     buero: Mapped[Buero] = relationship(back_populates="users")
@@ -287,6 +289,37 @@ class KiEinstellung(Base):
     api_key_verschluesselt: Mapped[str] = mapped_column(String(2000), default="", server_default="")
     updated_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), onupdate=func.now()
+    )
+
+
+class AuditEreignis(Base):
+    """Nachvollziehbarkeit: nur IDs und Aktionscodes, nie Inhalte oder Personendaten."""
+
+    __tablename__ = "audit_ereignis"
+
+    id: Mapped[uuid.UUID] = mapped_column(primary_key=True, default=uuid.uuid4)
+    buero_id: Mapped[uuid.UUID | None] = mapped_column(index=True)
+    user_id: Mapped[uuid.UUID | None] = mapped_column()
+    aktion: Mapped[str] = mapped_column(String(100))
+    objekt_typ: Mapped[str | None] = mapped_column(String(50))
+    objekt_id: Mapped[uuid.UUID | None] = mapped_column()
+    zeitpunkt: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), index=True
+    )
+
+
+class LoginFehlversuch(Base):
+    """Fehlversuch pro Schlüssel (SHA-256 von E-Mail bzw. IP) für Rate-Limit und Sperre."""
+
+    __tablename__ = "login_fehlversuch"
+
+    id: Mapped[uuid.UUID] = mapped_column(primary_key=True, default=uuid.uuid4)
+    art: Mapped[str] = mapped_column(String(10))
+    schluessel: Mapped[str] = mapped_column(String(64))
+    zeitpunkt: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+
+    __table_args__ = (
+        Index("ix_login_fehlversuch_art_schluessel", "art", "schluessel", "zeitpunkt"),
     )
 
 

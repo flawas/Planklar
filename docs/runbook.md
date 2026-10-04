@@ -71,3 +71,10 @@ Migration 0011 aktiviert RLS auf `dossier`, `dokument`, `seite`, `pruefung`, `be
 2. Web, Worker und Beat verwenden diese Rolle in `DATABASE_URL`; `alembic upgrade head` und `app_role` laufen mit `MIGRATION_DATABASE_URL` (Besitzerrolle, Fallback `DATABASE_URL`).
 3. `REQUIRE_RLS_ROLE=true` (in Compose gesetzt) bricht den Start ab, wenn die App-Rolle Superuser ist oder `BYPASSRLS` hat; sonst warnt das Log mit `DB_ROLE_BYPASSES_RLS`.
 4. Jeder Pfad setzt den Büro-Kontext über `BueroScope` (`app/db/rls.py`). Ohne Kontext liefern Abfragen keine Zeilen, das ist beabsichtigt. Celery-Tasks erhalten `buero_id` als Argument; der Retention-Job setzt den Kontext je Büro.
+
+## Login-Schutz und Audit-Log
+
+- Fehlversuche werden je E-Mail und je IP gezählt (`LOGIN_MAX_FEHLVERSUCHE_EMAIL`=5, `LOGIN_MAX_FEHLVERSUCHE_IP`=20 im Fenster `LOGIN_FENSTER_SEKUNDEN`=900). Danach antwortet der Login mit 429 und `Retry-After`, auch bei richtigem Passwort. Gespeichert werden nur SHA-256-Hashes.
+- Die IP stammt aus `request.client`. Hinter einem Reverse-Proxy muss uvicorn mit `--proxy-headers --forwarded-allow-ips=<Proxy>` laufen, sonst zählt die Proxy-IP.
+- `audit_ereignis` enthält nur IDs und Aktionscodes (Login, Benutzer-, Rollen- und Passwortaktionen), keine Inhalte oder Personendaten.
+- Rollenwechsel, (De-)Aktivierung und Passwortänderung erhöhen `user.session_version`; bestehende Sitzungen enden sofort.

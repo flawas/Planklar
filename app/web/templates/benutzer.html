@@ -1,0 +1,58 @@
+{% from "_icons.html" import icon %}
+{% extends "base.html" %}
+{% block title %}Benutzer{% endblock %}
+{% block content %}
+<h1>Benutzer</h1>
+<p>Benutzer Ihres Büros. Rollen- und Statusänderungen beenden die bestehenden Sitzungen der
+  betroffenen Person.</p>
+{% if meldung %}<p role="status" class="{{ 'ok' if ok else 'fehler' }}">{{ meldung }}</p>{% endif %}
+<table class="liste">
+  <caption class="nur-sr">Benutzer</caption>
+  <thead>
+    <tr>
+      <th scope="col">E-Mail</th><th scope="col">Rolle</th><th scope="col">Status</th>
+      <th scope="col"><span class="nur-sr">Aktionen</span></th>
+    </tr>
+  </thead>
+  <tbody>
+    {% for b in benutzer %}
+    <tr>
+      <td>{{ b.email }}</td>
+      <td>
+        <form method="post" action="/benutzer/{{ b.id }}/rolle" class="formular">
+          <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+          <label class="nur-sr" for="rolle-{{ b.id }}">Rolle von {{ b.email }}</label>
+          <select id="rolle-{{ b.id }}" name="rolle">
+            {% for wert, text in rollen.items() %}
+            <option value="{{ wert.value }}" {% if wert == b.rolle %}selected{% endif %}>{{ text }}</option>
+            {% endfor %}
+          </select>
+          <button type="submit" class="zweit">Rolle ändern</button>
+        </form>
+      </td>
+      <td>{{ "Aktiv" if b.is_active else "Deaktiviert" }}</td>
+      <td>
+        <form method="post" action="/benutzer/{{ b.id }}/status">
+          <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+          <input type="hidden" name="aktiv" value="{{ '0' if b.is_active else '1' }}">
+          <button type="submit" class="zweit">{{ "Deaktivieren" if b.is_active else "Aktivieren" }}</button>
+          <a class="btn text" href="/benutzer/{{ b.id }}/loeschen">{{ icon("delete") }}Löschen</a>
+        </form>
+      </td>
+    </tr>
+    {% endfor %}
+  </tbody>
+</table>
+
+<h2>Passwort ändern</h2>
+<p>Nach der Änderung müssen Sie sich neu anmelden.</p>
+{% if pw_fehler %}<p role="alert" class="fehler">{{ pw_fehler }}</p>{% endif %}
+<form method="post" action="/benutzer/passwort" class="formular">
+  <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+  <label for="old_password">Bisheriges Passwort</label>
+  <input id="old_password" name="old_password" type="password" autocomplete="current-password" required>
+  <label for="new_password">Neues Passwort (mindestens 10 Zeichen)</label>
+  <input id="new_password" name="new_password" type="password" autocomplete="new-password" minlength="10" required>
+  <button type="submit">Passwort ändern</button>
+</form>
+{% endblock %}

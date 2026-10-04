@@ -1,0 +1,74 @@
+"""Benutzerverwaltung im Büro: immer auf das Büro des handelnden Admins beschränkt."""
+
+import uuid
+
+from sqlalchemy import func, select
+from sqlalchemy.orm import Session
+
+from app.db.models import Rolle, User
+
+
+class UserNotFoundError(Exception):
+    """Benutzer existiert nicht oder gehört zu einem anderen Büro."""
+
+
+class LastAdminError(Exception):
+    """Der letzte aktive Büro-Admin darf nicht degradiert, deaktiviert oder gelöscht werden."""
+
+
+def list_users(session: Session, buero_id: uuid.UUID) -> list[User]:
+    stmt = select(User).where(User.buero_id == buero_id).order_by(User.email)
+    return list(session.execute(stmt).scalars())
+
+
+def _ist_aktiver_admin(user: User) -> bool:
+    return user.is_active and user.rolle == Rolle.BUERO_ADMIN
+
+
+def _andere_aktive_admins(session: Session, user: User) -> int:
+    stmt = select(func.count()).where(
+        User.buero_id == user.buero_id,
+        User.id != user.id,
+        User.is_active.is_(True),
+        User.rolle == Rolle.BUERO_ADMIN,
+    )
+    return session.execute(stmt).scalar_one()
+
+
+def update_user(
+    session: Session,
+    buero_id: uuid.UUID,
+    user_id: uuid.UUID,
+    *,
+    rolle: Rolle | None = None,
+    is_active: bool | None = None,
+) -> User:
+    # Zeile sperren, damit zwei gleichzeitige Änderungen nicht beide den "letzten" Admin treffen
+    user = session.execute(
+        select(User).where(User.id == user_id, User.buero_id == buero_id).with_for_update()
+    ).scalar_one_or_none()
+    if user is None:
+        raise UserNotFoundError
+    neue_rolle = rolle if rolle is not None else user.rolle
+    neu_aktiv = is_active if is_active is not None else user.is_active
+    bleibt_admin = neu_aktiv and neue_rolle == Rolle.BUERO_ADMIN
+    if _ist_aktiver_admin(user) and not bleibt_admin and _andere_aktive_admins(session, user) == 0:
+        session.rollback()
+        raise LastAdminError
+    user.rolle = neue_rolle
+    user.is_active = neu_aktiv
+    session.commit()
+    return user
+
+
+def delete_user(session: Session, buero_id: uuid.UUID, user_id: uuid.UUID) -> None:
+    user = session.execute(
+        select(User).where(User.id == user_id, User.buero_id == buero_id).with_for_update()
+    ).scalar_one_or_none()
+    if user is None:
+        raise UserNotFoundError
+    if _ist_aktiver_admin(user) and _andere_aktive_admins(session, user) == 0:
+        session.rollback()
+        raise LastAdminError
+    session.delete(user)
+    session.commit()

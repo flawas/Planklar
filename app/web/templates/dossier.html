@@ -1,3 +1,4 @@
+{% from "_icons.html" import icon %}
 {% extends "base.html" %}
 {% block title %}Dossier{% endblock %}
 {% block content %}
@@ -12,7 +13,7 @@
   <label for="files">PDF-Dateien (mehrere möglich)</label>
   <input id="files" name="files" type="file" accept="application/pdf,.pdf" multiple required>
   <progress id="fortschritt" class="fortschritt" max="100" value="0" aria-label="Upload-Fortschritt"></progress>
-  <button type="submit">Hochladen</button>
+  <button type="submit">{{ icon("upload_file") }}Hochladen</button>
 </form>
 <h2>Prüfung</h2>
 {% include "_pruefstatus.html" %}

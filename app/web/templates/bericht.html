@@ -1,9 +1,11 @@
+{% from "_icons.html" import icon %}
 {% extends "base.html" %}
 {% block title %}Prüfbericht{% endblock %}
 {% block content %}
-<p><a href="/dossiers/{{ dossier.id }}/ansicht">← Zurück zum Dossier</a>
+<p class="aktionen">
+  <a class="btn zweit" href="/dossiers/{{ dossier.id }}/ansicht">{{ icon("arrow_back") }}← Zurück zum Dossier</a>
   {% if pruefung.status.value == "abgeschlossen" %}
-  · <a href="/dossiers/{{ dossier.id }}/pruefungen/{{ pruefung.id }}/bericht.pdf">Als PDF herunterladen</a>
+  <a class="btn" href="/dossiers/{{ dossier.id }}/pruefungen/{{ pruefung.id }}/bericht.pdf">{{ icon("picture_as_pdf") }}Als PDF herunterladen</a>
   {% endif %}</p>
 {% include "_bericht.html" %}
 {% endblock %}

@@ -1,0 +1,5 @@
+# Reverse Proxy für web. SITE_ADDRESS kommt aus docker-compose.yml (lokal :80, in Produktion der Hostname mit automatischem TLS).
+{$SITE_ADDRESS::80} {
+	encode zstd gzip
+	reverse_proxy web:8000
+}

@@ -86,6 +86,18 @@ class Storage:
         key = object_key(buero_id, dossier_id, sha256)
         self._client.delete_object(Bucket=self._bucket, Key=key)
 
+    def delete_buero_prefix(self, buero_id: int | uuid.UUID) -> int:
+        """Löscht alle Objekte unter `buero/<id>/` (auch verwaiste) und gibt die Anzahl zurück."""
+        prefix = f"buero/{_check_id('buero_id', buero_id)}/"
+        geloescht = 0
+        paginator = self._client.get_paginator("list_objects_v2")
+        for page in paginator.paginate(Bucket=self._bucket, Prefix=prefix):
+            keys = [{"Key": o["Key"]} for o in page.get("Contents", [])]
+            if keys:
+                self._client.delete_objects(Bucket=self._bucket, Delete={"Objects": keys})
+                geloescht += len(keys)
+        return geloescht
+
     def signed_url(
         self,
         buero_id: int | uuid.UUID,

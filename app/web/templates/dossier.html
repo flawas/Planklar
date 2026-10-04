@@ -15,13 +15,7 @@
   <button type="submit">Hochladen</button>
 </form>
 <h2>Prüfung</h2>
-<form class="formular" method="post" action="/dossiers/{{ dossier.id }}/pruefen">
-  <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
-  <button type="submit">Prüfung starten</button>
-  {% if letzte_pruefung %}
-  <a href="/dossiers/{{ dossier.id }}/pruefungen/{{ letzte_pruefung.id }}/bericht">Letzten Bericht ansehen</a>
-  {% endif %}
-</form>
+{% include "_pruefstatus.html" %}
 <section id="dokumente" aria-live="polite">
   {% include "_dokumente.html" %}
 </section>

@@ -20,8 +20,9 @@ from app.db.models import User
 from app.db.session import get_session
 from app.dossiers.scope import BueroScope, NotFoundError
 from app.dossiers.service import UploadError, basename, get_storage, upload_dokument
+from app.pipeline import llm_config
 from app.storage import Storage
-from app.web import csrf, unterlagen, vorhaben
+from app.web import csrf, ki_einstellungen, unterlagen, vorhaben
 
 BASE_DIR = Path(__file__).parent
 templates = Jinja2Templates(directory=BASE_DIR / "templates")
@@ -40,6 +41,7 @@ MSG_UPLOAD = {
 MSG_KEINE_DATEI = "Bitte wählen Sie mindestens eine Datei aus."
 MSG_SCHRITT = "Ungültiger Schritt im Assistenten."
 MSG_NOT_LOGGED_IN = "Bitte melden Sie sich an."
+MSG_GESPEICHERT = "Einstellungen gespeichert."
 
 
 @dataclass
@@ -267,3 +269,100 @@ async def vorhaben_schritt(
     if request.headers.get("HX-Request"):
         return Response(status_code=204, headers={"HX-Redirect": ziel})
     return RedirectResponse(ziel, status.HTTP_303_SEE_OTHER)
+
+
+def _ki_seite(
+    request: Request,
+    user: User,
+    session: Session,
+    *,
+    werte: dict[str, str] | None = None,
+    fehler: dict[str, str] | None = None,
+    meldung: str = "",
+    ok: bool = True,
+    status_code: int = 200,
+) -> HTMLResponse:
+    row = llm_config.get_row(session)
+    gespeichert = {"modell": row.modell, "api_base": row.api_base} if row else {}
+    return _render(
+        request,
+        "ki_einstellungen.html",
+        user=user,
+        status_code=status_code,
+        werte=werte or {"modell": "", "api_base": "", **gespeichert},
+        fehler=fehler or {},
+        key_gesetzt=bool(row and row.api_key_verschluesselt),
+        key_unlesbar=bool(
+            row
+            and row.api_key_verschluesselt
+            and not llm_config.key_lesbar(row.api_key_verschluesselt)
+        ),
+        vorschlaege=ki_einstellungen.MODELL_VORSCHLAEGE,
+        meldung=meldung,
+        ok=ok,
+    )
+
+
+@web_router.get("/einstellungen/ki", response_model=None)
+def ki_einstellungen_form(
+    request: Request,
+    user: Annotated[User | None, Depends(_optional_user)],
+    session: Session = Depends(get_session),
+) -> Response:
+    if user is None:
+        return RedirectResponse("/login", status.HTTP_303_SEE_OTHER)
+    if not user.is_superuser:
+        return _render(request, "nicht_gefunden.html", user=user, status_code=404)
+    return _ki_seite(request, user, session)
+
+
+@web_router.post("/einstellungen/ki", response_model=None)
+def ki_einstellungen_speichern(
+    request: Request,
+    user: Annotated[User | None, Depends(_optional_user)],
+    modell: Annotated[str, Form()] = "",
+    api_base: Annotated[str, Form()] = "",
+    api_key: Annotated[str, Form()] = "",
+    clear_key: Annotated[str, Form()] = "",
+    csrf_token: Annotated[str, Form()] = "",
+    session: Session = Depends(get_session),
+) -> Response:
+    if user is None:
+        return _render(request, "_fehler.html", status_code=401, error=MSG_NOT_LOGGED_IN)
+    if not user.is_superuser:
+        return _render(request, "nicht_gefunden.html", user=user, status_code=404)
+    if not csrf.matches(request.cookies.get(csrf.CSRF_COOKIE), csrf_token):
+        return _render(request, "_fehler.html", user=user, status_code=403, error=MSG_CSRF)
+    werte = {"modell": modell.strip(), "api_base": api_base.strip()}
+    fehler = ki_einstellungen.validiere(werte["modell"], werte["api_base"])
+    if fehler:
+        return _ki_seite(request, user, session, werte=werte, fehler=fehler, status_code=422)
+    llm_config.save_config(
+        session,
+        model=werte["modell"],
+        api_base=werte["api_base"],
+        api_key=api_key.strip() or None,
+        clear_key=bool(clear_key),
+    )
+    return _ki_seite(request, user, session, meldung=MSG_GESPEICHERT)
+
+
+@web_router.post("/einstellungen/ki/test", response_model=None)
+def ki_verbindung_testen(
+    request: Request,
+    user: Annotated[User | None, Depends(_optional_user)],
+    csrf_token: Annotated[str, Form()] = "",
+    session: Session = Depends(get_session),
+) -> Response:
+    if user is None:
+        return _render(request, "_fehler.html", status_code=401, error=MSG_NOT_LOGGED_IN)
+    if not user.is_superuser:
+        return _render(request, "nicht_gefunden.html", user=user, status_code=404)
+    if not csrf.matches(request.cookies.get(csrf.CSRF_COOKIE), csrf_token):
+        return _render(request, "_fehler.html", user=user, status_code=403, error=MSG_CSRF)
+    if not llm_config.load_config(session).model:
+        return _ki_seite(
+            request, user, session, meldung=ki_einstellungen.MSG_TEST_KEIN_MODELL, ok=False
+        )
+    ok, meldung = ki_einstellungen.verbindung_testen()
+    return _ki_seite(request, user, session, meldung=meldung, ok=ok)

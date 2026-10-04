@@ -13,8 +13,7 @@ import sys
 from collections.abc import Sequence
 from pathlib import Path
 
-from app.config import get_settings
-from app.pipeline.llm import LLMClient
+from app.pipeline.llm import LiteLLMClient, LLMClient
 from eval.harness import DataError, evaluate, load_seiten, to_json, to_markdown
 
 DEFAULT_DATA = Path(__file__).parent / "data"
@@ -35,15 +34,9 @@ def main(argv: Sequence[str] | None = None, *, client: LLMClient | None = None) 
         return 2
 
     if client is None:
-        # Das Modell kommt aus den Settings (`LLM_MODEL`); hier für diesen Lauf überschrieben.
-        settings = get_settings()
-        previous = settings.llm_model
-        settings.llm_model = args.model
-    try:
-        result = evaluate(seiten, model=args.model, client=client)
-    finally:
-        if client is None:
-            settings.llm_model = previous
+        # Schlüssel und Endpunkt wie im Betrieb (GUI-Einstellungen/Umgebung), Modell aus --model.
+        client = LiteLLMClient(model=args.model)
+    result = evaluate(seiten, model=args.model, client=client)
 
     args.out.mkdir(parents=True, exist_ok=True)
     stem = re.sub(r"[^A-Za-z0-9._-]+", "_", args.model)

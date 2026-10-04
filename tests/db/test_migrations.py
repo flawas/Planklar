@@ -12,6 +12,7 @@ TABELLEN = {
     "regel",
     "pruefung",
     "befund",
+    "ki_einstellung",
 }
 
 

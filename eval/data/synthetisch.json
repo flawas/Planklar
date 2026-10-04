@@ -1,0 +1,246 @@
+{
+  "seiten": [
+    {
+      "id": "weggis-s1",
+      "bild": "weggis-s1.png",
+      "text": "",
+      "plantyp": "Situationsplan",
+      "merkmale": {
+        "massstab": {
+          "vorhanden": "ja",
+          "wert": "1:500"
+        },
+        "datum": {
+          "vorhanden": "ja",
+          "wert": "01.10.2026"
+        },
+        "planverfasser": {
+          "vorhanden": "ja",
+          "wert": "Beispiel Architektur AG"
+        },
+        "nordpfeil": {
+          "vorhanden": "ja"
+        }
+      }
+    },
+    {
+      "id": "weggis-s2",
+      "bild": "weggis-s2.png",
+      "text": "",
+      "plantyp": "Grundriss",
+      "merkmale": {
+        "massstab": {
+          "vorhanden": "ja",
+          "wert": "1:100"
+        },
+        "datum": {
+          "vorhanden": "ja",
+          "wert": "01.10.2026"
+        },
+        "planverfasser": {
+          "vorhanden": "ja",
+          "wert": "Beispiel Architektur AG"
+        },
+        "nordpfeil": {
+          "vorhanden": "ja"
+        },
+        "legende_farbcodierung": {
+          "vorhanden": "nein"
+        }
+      }
+    },
+    {
+      "id": "weggis-s3",
+      "bild": "weggis-s3.png",
+      "text": "",
+      "plantyp": "Grundriss",
+      "merkmale": {
+        "massstab": {
+          "vorhanden": "ja",
+          "wert": "1:100"
+        },
+        "datum": {
+          "vorhanden": "ja",
+          "wert": "01.10.2026"
+        },
+        "planverfasser": {
+          "vorhanden": "ja",
+          "wert": "Beispiel Architektur AG"
+        },
+        "nordpfeil": {
+          "vorhanden": "ja"
+        },
+        "legende_farbcodierung": {
+          "vorhanden": "nein"
+        }
+      }
+    },
+    {
+      "id": "weggis-s4",
+      "bild": "weggis-s4.png",
+      "text": "",
+      "plantyp": "Fassade/Ansicht",
+      "merkmale": {
+        "massstab": {
+          "vorhanden": "ja",
+          "wert": "1:100"
+        },
+        "datum": {
+          "vorhanden": "ja",
+          "wert": "01.10.2026"
+        },
+        "planverfasser": {
+          "vorhanden": "ja",
+          "wert": "Beispiel Architektur AG"
+        },
+        "legende_farbcodierung": {
+          "vorhanden": "nein"
+        }
+      }
+    },
+    {
+      "id": "weggis-s5",
+      "bild": "weggis-s5.png",
+      "text": "",
+      "plantyp": "Schnitt",
+      "merkmale": {
+        "massstab": {
+          "vorhanden": "ja",
+          "wert": "1:100"
+        },
+        "datum": {
+          "vorhanden": "ja",
+          "wert": "01.10.2026"
+        },
+        "planverfasser": {
+          "vorhanden": "ja",
+          "wert": "Beispiel Architektur AG"
+        },
+        "legende_farbcodierung": {
+          "vorhanden": "nein"
+        }
+      }
+    },
+    {
+      "id": "kuessnacht-s1",
+      "bild": "kuessnacht-s1.png",
+      "text": "",
+      "plantyp": "Situationsplan",
+      "merkmale": {
+        "massstab": {
+          "vorhanden": "ja",
+          "wert": "1:500"
+        },
+        "datum": {
+          "vorhanden": "ja",
+          "wert": "01.10.2026"
+        },
+        "planverfasser": {
+          "vorhanden": "ja",
+          "wert": "Entwurf Planung GmbH"
+        },
+        "nordpfeil": {
+          "vorhanden": "ja"
+        }
+      }
+    },
+    {
+      "id": "kuessnacht-s2",
+      "bild": "kuessnacht-s2.png",
+      "text": "",
+      "plantyp": "Grundriss",
+      "merkmale": {
+        "massstab": {
+          "vorhanden": "ja",
+          "wert": "1:100"
+        },
+        "datum": {
+          "vorhanden": "ja",
+          "wert": "01.10.2026"
+        },
+        "planverfasser": {
+          "vorhanden": "ja",
+          "wert": "Entwurf Planung GmbH"
+        },
+        "nordpfeil": {
+          "vorhanden": "ja"
+        },
+        "legende_farbcodierung": {
+          "vorhanden": "nein"
+        }
+      }
+    },
+    {
+      "id": "kuessnacht-s3",
+      "bild": "kuessnacht-s3.png",
+      "text": "",
+      "plantyp": "Grundriss",
+      "merkmale": {
+        "massstab": {
+          "vorhanden": "ja",
+          "wert": "1:100"
+        },
+        "datum": {
+          "vorhanden": "ja",
+          "wert": "01.10.2026"
+        },
+        "planverfasser": {
+          "vorhanden": "ja",
+          "wert": "Entwurf Planung GmbH"
+        },
+        "nordpfeil": {
+          "vorhanden": "ja"
+        },
+        "legende_farbcodierung": {
+          "vorhanden": "nein"
+        }
+      }
+    },
+    {
+      "id": "kuessnacht-s4",
+      "bild": "kuessnacht-s4.png",
+      "text": "",
+      "plantyp": "Fassade/Ansicht",
+      "merkmale": {
+        "massstab": {
+          "vorhanden": "ja",
+          "wert": "1:100"
+        },
+        "datum": {
+          "vorhanden": "ja",
+          "wert": "01.10.2026"
+        },
+        "planverfasser": {
+          "vorhanden": "ja",
+          "wert": "Entwurf Planung GmbH"
+        },
+        "legende_farbcodierung": {
+          "vorhanden": "nein"
+        }
+      }
+    },
+    {
+      "id": "kuessnacht-s5",
+      "bild": "kuessnacht-s5.png",
+      "text": "",
+      "plantyp": "Schnitt",
+      "merkmale": {
+        "massstab": {
+          "vorhanden": "ja",
+          "wert": "1:100"
+        },
+        "datum": {
+          "vorhanden": "ja",
+          "wert": "01.10.2026"
+        },
+        "planverfasser": {
+          "vorhanden": "ja",
+          "wert": "Entwurf Planung GmbH"
+        },
+        "legende_farbcodierung": {
+          "vorhanden": "nein"
+        }
+      }
+    }
+  ]
+}

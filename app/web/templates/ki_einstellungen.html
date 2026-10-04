@@ -1,0 +1,39 @@
+{% extends "base.html" %}
+{% block title %}KI-Einstellungen{% endblock %}
+{% block content %}
+<h1>KI-Einstellungen</h1>
+<p>Anbieter, Modell und Zugangsschlüssel für die Seitenanalyse. Es werden nur einzelne Seiten oder
+  Ausschnitte gesendet, nie ganze Dossiers. Die Einstellungen gelten für die ganze Installation.</p>
+{% if meldung %}<p role="status" class="{{ 'ok' if ok else 'fehler' }}">{{ meldung }}</p>{% endif %}
+<form method="post" action="/einstellungen/ki" class="formular">
+  <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+  <label for="modell">Modell (LiteLLM-Name)</label>
+  <input id="modell" name="modell" list="modelle" value="{{ werte.modell }}" required
+         autocomplete="off" {% if fehler.modell %}aria-invalid="true" aria-describedby="e-modell"{% endif %}>
+  <datalist id="modelle">
+    {% for m in vorschlaege %}<option value="{{ m }}">{% endfor %}
+  </datalist>
+  {% if fehler.modell %}<p id="e-modell" class="fehler">{{ fehler.modell }}</p>{% endif %}
+
+  <label for="api_base">Endpunkt (optional, z. B. EU-Region)</label>
+  <input id="api_base" name="api_base" type="url" value="{{ werte.api_base }}"
+         placeholder="https://eu.api.openai.com/v1" autocomplete="off"
+         {% if fehler.api_base %}aria-invalid="true" aria-describedby="e-base"{% endif %}>
+  {% if fehler.api_base %}<p id="e-base" class="fehler">{{ fehler.api_base }}</p>{% endif %}
+
+  <label for="api_key">API-Schlüssel</label>
+  <input id="api_key" name="api_key" type="password" autocomplete="new-password"
+         placeholder="{{ 'Nicht mehr lesbar – bitte neu setzen' if key_unlesbar else ('Hinterlegt – leer lassen zum Beibehalten' if key_gesetzt else 'Noch nicht hinterlegt') }}">
+  {% if key_unlesbar %}<p class="fehler">Der gespeicherte Schlüssel ist nicht mehr lesbar (Geheimnis der Installation gewechselt). Bitte den API-Schlüssel neu setzen.</p>{% endif %}
+  {% if key_gesetzt %}
+  <label><input type="checkbox" name="clear_key" value="1"> Gespeicherten Schlüssel entfernen</label>
+  {% endif %}
+
+  <button type="submit">Speichern</button>
+</form>
+<form method="post" action="/einstellungen/ki/test" class="formular">
+  <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+  <button type="submit" class="zweit">Verbindung testen</button>
+</form>
+<p><a href="/">Zurück</a></p>
+{% endblock %}

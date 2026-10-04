@@ -245,3 +245,22 @@ class Befund(Base):
     override_am: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
 
     pruefung: Mapped[Pruefung] = relationship(back_populates="befunde")
+
+
+class KiEinstellung(Base):
+    """KI-Anbieter-Konfiguration der Installation (genau eine Zeile, `id = 1`).
+
+    Bewusst nicht mandantengebunden: Anbieter und Schlüssel gelten für den ganzen Betrieb
+    (ADR 0004) und sind nur für Superuser einsehbar. Der Schlüssel liegt verschlüsselt.
+    """
+
+    __tablename__ = "ki_einstellung"
+    __table_args__ = (CheckConstraint("id = 1", name="ki_einstellung_singleton"),)
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, default=1)
+    modell: Mapped[str] = mapped_column(String(200), default="", server_default="")
+    api_base: Mapped[str] = mapped_column(String(500), default="", server_default="")
+    api_key_verschluesselt: Mapped[str] = mapped_column(String(2000), default="", server_default="")
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), onupdate=func.now()
+    )

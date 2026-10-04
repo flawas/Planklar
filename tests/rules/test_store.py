@@ -97,3 +97,16 @@ def test_ungueltiger_katalog_verhindert_start(
     monkeypatch.setattr(main, "lade_katalog", partial(lade_katalog, root=tmp_path))
     with pytest.raises(RegelLadeFehler, match="kanton.yaml"), TestClient(main.app):
         pass
+
+
+def test_start_laedt_katalog_ohne_duplikate(
+    monkeypatch: pytest.MonkeyPatch, session: Session, tmp_path: Path
+) -> None:
+    root = _katalog(tmp_path, [_rule("a")], [_rule("c", "Luzern")])
+    monkeypatch.setattr(main, "lade_katalog", partial(lade_katalog, root=root))
+    for _ in range(2):
+        with TestClient(main.app) as client:
+            assert client.get("/health").status_code == 200
+        session.expire_all()
+        assert session.scalar(select(func.count()).select_from(Regelset)) == 2
+        assert session.scalar(select(func.count()).select_from(Regel)) == 3

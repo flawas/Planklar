@@ -1,7 +1,7 @@
 import uuid
 
 from fastapi.testclient import TestClient
-from sqlalchemy import select
+from sqlalchemy import event, select
 from sqlalchemy.orm import Session
 
 from app.db.models import Buero, Dossier, Kanton, Rolle, User, Vorhabenstyp
@@ -70,6 +70,29 @@ def test_letzter_admin_geschuetzt(client: TestClient, db: Session) -> None:
     assert client.delete(url).status_code == 409
     db.refresh(admin)
     assert admin.is_active and admin.rolle == Rolle.BUERO_ADMIN
+
+
+def test_alle_admins_des_buero_werden_gesperrt(client: TestClient, db: Session) -> None:
+    # Zwei Admins, die sich gegenseitig degradieren, müssen sich serialisieren: dafür müssen
+    # vor der Zählung alle Admin-Zeilen des Büros (in fester Reihenfolge) gesperrt sein.
+    admin = make_user(db, "admin@a.ch", admin=True)
+    zweiter = _in_buero(db, admin, "b@a.ch", rolle=Rolle.BUERO_ADMIN)
+    login(client, "admin@a.ch")
+    statements: list[str] = []
+
+    def mitschneiden(conn, cursor, statement, *args):  # type: ignore[no-untyped-def]
+        statements.append(statement)
+
+    engine = db.get_bind()
+    event.listen(engine, "before_cursor_execute", mitschneiden)
+    try:
+        r = client.patch(f"/admin/users/{zweiter.id}", json={"rolle": "mitarbeiter"})
+    finally:
+        event.remove(engine, "before_cursor_execute", mitschneiden)
+    assert r.status_code == 200
+    sperren = [s for s in statements if "FOR UPDATE" in s]
+    assert sperren
+    assert "rolle" in sperren[0] and "ORDER BY" in sperren[0]
 
 
 def test_admin_darf_sich_degradieren_wenn_weiterer_admin_existiert(

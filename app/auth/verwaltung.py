@@ -35,6 +35,32 @@ def _andere_aktive_admins(session: Session, user: User) -> int:
     return session.execute(stmt).scalar_one()
 
 
+def _admins_sperren(session: Session, buero_id: uuid.UUID) -> None:
+    """Alle Admin-Zeilen des Büros in fester Reihenfolge sperren.
+
+    Nur so serialisieren sich gleichzeitige Änderungen an verschiedenen Admins desselben Büros;
+    die feste Reihenfolge verhindert Deadlocks.
+    """
+    stmt = (
+        select(User.id)
+        .where(User.buero_id == buero_id, User.rolle == Rolle.BUERO_ADMIN)
+        .order_by(User.id)
+        .with_for_update()
+    )
+    session.execute(stmt).all()
+
+
+def _benutzer_laden(session: Session, buero_id: uuid.UUID, user_id: uuid.UUID) -> User:
+    _admins_sperren(session, buero_id)
+    user = session.execute(
+        select(User).where(User.id == user_id, User.buero_id == buero_id).with_for_update()
+    ).scalar_one_or_none()
+    if user is None:
+        session.rollback()
+        raise UserNotFoundError
+    return user
+
+
 def update_user(
     session: Session,
     buero_id: uuid.UUID,
@@ -43,12 +69,8 @@ def update_user(
     rolle: Rolle | None = None,
     is_active: bool | None = None,
 ) -> User:
-    # Zeile sperren, damit zwei gleichzeitige Änderungen nicht beide den "letzten" Admin treffen
-    user = session.execute(
-        select(User).where(User.id == user_id, User.buero_id == buero_id).with_for_update()
-    ).scalar_one_or_none()
-    if user is None:
-        raise UserNotFoundError
+    # Admins sperren, damit zwei gleichzeitige Änderungen nicht beide den "letzten" Admin treffen
+    user = _benutzer_laden(session, buero_id, user_id)
     neue_rolle = rolle if rolle is not None else user.rolle
     neu_aktiv = is_active if is_active is not None else user.is_active
     bleibt_admin = neu_aktiv and neue_rolle == Rolle.BUERO_ADMIN
@@ -62,11 +84,7 @@ def update_user(
 
 
 def delete_user(session: Session, buero_id: uuid.UUID, user_id: uuid.UUID) -> None:
-    user = session.execute(
-        select(User).where(User.id == user_id, User.buero_id == buero_id).with_for_update()
-    ).scalar_one_or_none()
-    if user is None:
-        raise UserNotFoundError
+    user = _benutzer_laden(session, buero_id, user_id)
     if _ist_aktiver_admin(user) and _andere_aktive_admins(session, user) == 0:
         session.rollback()
         raise LastAdminError

@@ -5,6 +5,7 @@ from sqlalchemy import event, select
 from sqlalchemy.orm import Session
 
 from app.db.models import Buero, Dossier, Kanton, Rolle, User, Vorhabenstyp
+from app.db.session import get_engine
 from tests.auth.conftest import PASSWORD, make_user
 from tests.auth.test_auth import login
 
@@ -83,7 +84,7 @@ def test_alle_admins_des_buero_werden_gesperrt(client: TestClient, db: Session) 
     def mitschneiden(conn, cursor, statement, *args):  # type: ignore[no-untyped-def]
         statements.append(statement)
 
-    engine = db.get_bind()
+    engine = get_engine()  # die App nutzt ihren eigenen Engine, nicht den der Test-Session
     event.listen(engine, "before_cursor_execute", mitschneiden)
     try:
         r = client.patch(f"/admin/users/{zweiter.id}", json={"rolle": "mitarbeiter"})
